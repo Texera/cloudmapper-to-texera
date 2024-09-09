@@ -40,7 +40,7 @@ object ClusterResource {
 class ClusterResource {
 
   /**
-    * Creates a new cluster and records the start time in cluster_activity.
+    * Launches a new cluster and records the start time in cluster_activity.
     *
     * @param user The authenticated user creating the cluster.
     * @param name The name of the cluster.
@@ -49,9 +49,9 @@ class ClusterResource {
     * @return The created Cluster object.
     */
   @POST
-  @Path("/create")
+  @Path("/launch")
   @Consumes(Array(MediaType.MULTIPART_FORM_DATA))
-  def createCluster(
+  def launchCluster(
       @Auth user: SessionUser,
       @FormDataParam("Name") name: String,
       @FormDataParam("machineType") machineType: String,
@@ -62,16 +62,17 @@ class ClusterResource {
     cluster.setOwnerId(user.getUid)
     cluster.setMachineType(machineType)
     cluster.setNumberOfMachines(numberOfMachines)
-    cluster.setStatus(ClusterStatus.LAUNCHING)
+    cluster.setStatus(ClusterStatus.LAUNCH_RECEIVED)
     clusterDao.insert(cluster)
 
     // Call Go microservice to actually create the cluster
     callCreateClusterAPI(cluster.getCid, machineType, numberOfMachines) match {
       case Right(goResponse) =>
+        updateClusterStatus(cluster.getCid, ClusterStatus.PENDING, context)
         Response.ok(clusterDao.fetchOneByCid(cluster.getCid)).build()
 
       case Left(errorMessage) =>
-        updateClusterStatus(cluster.getCid, ClusterStatus.FAILED, context)
+        updateClusterStatus(cluster.getCid, ClusterStatus.LAUNCH_FAILED, context)
         Response
           .status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity(s"Cluster creation failed: $errorMessage")
@@ -80,31 +81,32 @@ class ClusterResource {
   }
 
   /**
-    * Deletes a cluster and records the termination time in cluster_activity.
+    * Terminates a cluster and records the termination time in cluster_activity.
     *
     * @param user The authenticated user requesting the deletion.
     * @param cluster The cluster to be deleted.
     * @return A Response indicating the result of the operation.
     */
   @POST
-  @Path("/delete")
-  def deleteCluster(@Auth user: SessionUser, cluster: Cluster): Response = {
+  @Path("/terminate")
+  def terminateCluster(@Auth user: SessionUser, cluster: Cluster): Response = {
     val clusterId = cluster.getCid
     validateClusterOwnership(user, clusterId)
 
-    updateClusterStatus(clusterId, ClusterStatus.TERMINATING, context)
+    updateClusterStatus(clusterId, ClusterStatus.TERMINATE_RECEIVED, context)
 
     // Call Go microservice to actually delete the cluster
     callDeleteClusterAPI(clusterId) match {
       case Right(goResponse) =>
+        updateClusterStatus(clusterId, ClusterStatus.SHUTTING_DOWN, context)
         Response.ok(goResponse).build()
 
       case Left(errorMessage) =>
         updateClusterStatus(
           clusterId,
-          ClusterStatus.FAILED,
+          ClusterStatus.TERMINATE_FAILED,
           context
-        ) // Assuming you have a FAILED status
+        )
         Response
           .status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity(s"Cluster deletion failed: $errorMessage")
@@ -113,23 +115,24 @@ class ClusterResource {
   }
 
   /**
-    * Pauses a cluster and records the pause time in cluster_activity.
+    * Stops a cluster and records the pause time in cluster_activity.
     *
     * @param user The authenticated user requesting the pause.
     * @param cluster The cluster to be paused.
     * @return A Response indicating the result of the operation.
     */
   @POST
-  @Path("/pause")
-  def pauseCluster(@Auth user: SessionUser, cluster: Cluster): Response = {
+  @Path("/stop")
+  def stopCluster(@Auth user: SessionUser, cluster: Cluster): Response = {
     validateClusterOwnership(user, cluster.getCid)
 
-    updateClusterStatus(cluster.getCid, ClusterStatus.PAUSING, context)
+    updateClusterStatus(cluster.getCid, ClusterStatus.STOP_RECEIVED, context)
 
     // TODO: Call the Go Microservice
+    updateClusterStatus(cluster.getCid, ClusterStatus.STOPPING, context)
     // TODO: need to consider if the pause fails
 
-    updateClusterStatus(cluster.getCid, ClusterStatus.PAUSED, context)
+    updateClusterStatus(cluster.getCid, ClusterStatus.STOPPED, context)
 
     updateClusterActivityEndTime(cluster.getCid, context)
 
@@ -137,23 +140,24 @@ class ClusterResource {
   }
 
   /**
-    * Resumes a paused cluster and records the resume time in cluster_activity.
+    * Starts a stopped cluster and records the resume time in cluster_activity.
     *
     * @param user The authenticated user requesting the resume.
     * @param cluster The cluster to be resumed.
     * @return A Response indicating the result of the operation.
     */
   @POST
-  @Path("/resume")
-  def resumeCluster(@Auth user: SessionUser, cluster: Cluster): Response = {
+  @Path("/start")
+  def startCluster(@Auth user: SessionUser, cluster: Cluster): Response = {
     validateClusterOwnership(user, cluster.getCid)
 
-    updateClusterStatus(cluster.getCid, ClusterStatus.RESUMING, context)
+    updateClusterStatus(cluster.getCid, ClusterStatus.START_RECEIVED, context)
 
     // TODO: Call the Go Microservice
+    updateClusterStatus(cluster.getCid, ClusterStatus.PENDING, context)
     // TODO: need to consider if the resume fails
 
-    updateClusterStatus(cluster.getCid, ClusterStatus.LAUNCHED, context)
+    updateClusterStatus(cluster.getCid, ClusterStatus.RUNNING, context)
 
     Response.ok().build()
   }

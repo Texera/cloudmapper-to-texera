@@ -47,9 +47,9 @@ export class ClusterComponent implements OnInit {
       );
   }
 
-  createCluster(formData: FormData) {
+  launchCluster(formData: FormData) {
     this.clusterService
-      .createCluster(formData)
+      .launchCluster(formData)
       .pipe(untilDestroyed(this))
       .subscribe(
         response => console.log("Response: ", response),
@@ -57,9 +57,9 @@ export class ClusterComponent implements OnInit {
       );
   }
 
-  deleteCluster(cluster: Clusters): void {
+  terminateCluster(cluster: Clusters): void {
     this.clusterService
-      .deleteCluster(cluster)
+      .terminateCluster(cluster)
       .pipe(untilDestroyed(this))
       .subscribe(
         response => console.log("Response: ", response),
@@ -67,9 +67,9 @@ export class ClusterComponent implements OnInit {
       );
   }
 
-  pauseCluster(cluster: Clusters): void {
+  stopCluster(cluster: Clusters): void {
     this.clusterService
-      .pauseCluster(cluster)
+      .stopCluster(cluster)
       .pipe(untilDestroyed(this))
       .subscribe(
         response => console.log("Response: ", response),
@@ -77,9 +77,9 @@ export class ClusterComponent implements OnInit {
       );
   }
 
-  resumeCluster(cluster: Clusters): void {
+  startCluster(cluster: Clusters): void {
     this.clusterService
-      .resumeCluster(cluster)
+      .startCluster(cluster)
       .pipe(untilDestroyed(this))
       .subscribe(
         response => console.log("Response: ", response),
@@ -102,7 +102,7 @@ export class ClusterComponent implements OnInit {
     formData.append("Name", clusterForm.value.Name);
     formData.append("machineType", clusterForm.value.machineType);
     formData.append("numberOfMachines", clusterForm.value.numberOfMachines);
-    this.createCluster(formData);
+    this.launchCluster(formData);
     this.closeClusterManagementModal();
   }
 
@@ -116,20 +116,28 @@ export class ClusterComponent implements OnInit {
 
   getBadgeStatus(status: string): string[]{
     switch(status){
-      case "LAUNCHING":
-      case "RESUMING":
+      case "PENDING":
+      case "STARTING":
         return ["play-circle", "orange"];
-      case "PAUSING":
+      case "STOPPING":
         return ["pause-circle", "orange"];
-      case "LAUNCHED":
+      case "RUNNING":
         return ["check-circle", "green"];
-      case "PAUSED":
+      case "STOPPED":
         return ["pause-circle", "gray"];
-      case "TERMINATING":
+      case "SHUTTING_DOWN":
         return ["minus-circle", "orange"];
       case "TERMINATED":
-      case "FAILED":
+      case "LAUNCH_FAILED":
+      case "TERMINATE_FAILED":
+      case "STOP_FAILED":
+      case "START_FAILED":
         return ["minus-circle", "red"];
+      case "LAUNCH_RECEIVED":
+      case "TERMINATE_RECEIVED":
+      case "STOP_RECEIVED":
+      case "START_RECEIVED":
+        return ["loading", "black"]
       default:
         return ["exclamation-circle", "gray"];
     }
