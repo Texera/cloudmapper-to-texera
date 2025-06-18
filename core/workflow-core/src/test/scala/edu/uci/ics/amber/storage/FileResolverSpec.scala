@@ -82,6 +82,10 @@ class FileResolverSpec
 
   private val dataset1TxtFilePath = "/test_user@test.com/test_dataset/v1/1.txt"
 
+  private val datasetDirectoryPathV1 = "/test_user@test.com/test_dataset/v1"
+
+  private val datasetDirectoryPathV2 = "/test_user@test.com/test_dataset/v2"
+
   override protected def beforeAll(): Unit = {
     initializeDBAndReplaceDSLContext()
 

@@ -2,6 +2,7 @@ package edu.uci.ics.amber.operator.cloudmapper
 
 import com.fasterxml.jackson.annotation.{JsonProperty, JsonPropertyDescription}
 import com.kjetland.jackson.jsonSchema.annotations.JsonSchemaTitle
+import edu.uci.ics.amber.core.storage.{DocumentFactory, FileResolver}
 import edu.uci.ics.amber.core.tuple.{Attribute, AttributeType, Schema}
 import edu.uci.ics.amber.core.workflow.{OutputPort, PortIdentity}
 import edu.uci.ics.amber.operator.metadata.{OperatorGroupConstants, OperatorInfo}
@@ -40,11 +41,12 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
   }
 
   override def generatePythonCode(): String = {
-    val (filepath, fileDesc) =
-      OperatorFilePathUtils.determineFilePathOrDatasetFile(Some(directoryName), isFile = false)
-    val fastQDatasetPath = if (filepath != null) filepath else fileDesc.asDirectory()
+    val directoryUri = FileResolver.resolveDirectory(directoryName)
+    println(directoryUri.toASCIIString)
 
-    println(fastQDatasetPath)
+    val directoryDocument = DocumentFactory.openReadonlyDocument(directoryUri, isDirectory = true)
+    val directoryFile = directoryDocument.asFile()
+    println(directoryFile.getAbsolutePath)
 
     // Convert the Scala referenceGenome to a Python string
     val pythonReferenceGenome = s"'${referenceGenome.referenceGenome.getName}'"
@@ -91,10 +93,10 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |        def create_job_form_data(cluster_id, job_form):
        |            form_data = {
        |                'cid': str(cluster_id),
-       |                'reads_path': str(job_form.get('reads'))
        |            }
        |
        |            files = {}
+       |            files['reads'] = open(r'${directoryFile.getAbsolutePath}', 'rb')
        |
        |            # Append selected genomes and related files
        |            append_selected_genomes_to_form_data(form_data, files, job_form)
@@ -122,7 +124,6 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |
        |        # Example job_form dictionary using inputs from Scala
        |        job_form = {
-       |            'reads': '${fastQDatasetPath}',
        |            'referenceGenome': ${pythonAllReferenceGenomes},
        |            'fastaFiles': ${pythonFastaFiles} if 'My Reference' in ${pythonAllReferenceGenomes} else [],
        |            'gtfFile': ${pythonGtfFile}

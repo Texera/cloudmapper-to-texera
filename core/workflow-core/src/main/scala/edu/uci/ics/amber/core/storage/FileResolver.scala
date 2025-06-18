@@ -62,6 +62,21 @@ object FileResolver {
       .getOrElse(throw new FileNotFoundException(fileName))
   }
 
+  def resolveDirectory(directoryName: String): URI = {
+    if (isFileResolved(directoryName)) {
+      return new URI(directoryName)
+    }
+    val resolvers: Seq[String => URI] = Seq(localDirectoryResolveFunc, datasetDirectoryResolveFunc)
+
+    // Try each resolver function in sequence
+    resolvers
+      .map(resolver => Try(resolver(directoryName)))
+      .collectFirst {
+        case Success(output) => output
+      }
+      .getOrElse(throw new FileNotFoundException(directoryName))
+  }
+
   /**
     * Attempts to resolve a local file path.
     * @throws FileNotFoundException if the local file does not exist
@@ -73,6 +88,21 @@ object FileResolver {
       throw new FileNotFoundException(s"Local file $fileName does not exist")
     }
     filePath.toUri
+  }
+
+  /**
+    * Attempts to resolve a local directory path.
+    * @throws FileNotFoundException if the local directory does not exist
+    * @param directoryName the name of the directory to check
+    */
+  private def localDirectoryResolveFunc(directoryName: String): URI = {
+    val directoryPath = Paths.get(directoryName)
+    if (!Files.exists(directoryPath) || !Files.isDirectory(directoryPath)) {
+      throw new FileNotFoundException(
+        s"Local directory $directoryName does not exist or is not a directory"
+      )
+    }
+    directoryPath.toUri
   }
 
   /**
@@ -151,6 +181,71 @@ object FileResolver {
     } catch {
       case e: Exception =>
         throw new FileNotFoundException(s"Dataset file $fileName not found.")
+    }
+  }
+
+  /**
+    * Attempts to resolve a given directoryName to a URI.
+    *
+    * The directoryName format should be: /ownerEmail/datasetName/versionName
+    *   e.g. /bob@texera.com/twitterDataset/v1
+    * The output dataset URI format is: {DATASET_FILE_URI_SCHEME}:///{did}/{versionHash}/
+    *   e.g. {DATASET_FILE_URI_SCHEME}:///15/adeq233td/
+    *
+    * @param directoryName the name of the directory to attempt resolving as a dataset directory
+    * @return A URI pointing to the dataset directory
+    * @throws FileNotFoundException if the dataset directory does not exist or cannot be created
+    */
+  private def datasetDirectoryResolveFunc(directoryName: String): URI = {
+    val directoryPath = Paths.get(directoryName)
+    val pathSegments =
+      (0 until directoryPath.getNameCount).map(directoryPath.getName(_).toString).toArray
+
+    // extract info from the user-given directoryName
+    val ownerEmail = pathSegments(0)
+    val datasetName = pathSegments(1)
+    val versionName = pathSegments(2)
+
+    // fetch the dataset and version from DB to get dataset ID and version hash
+    val (dataset, datasetVersion) =
+      withTransaction(
+        SqlServer
+          .getInstance()
+          .createDSLContext()
+      ) { ctx =>
+        // fetch the dataset from DB
+        val dataset = ctx
+          .select(DATASET.fields: _*)
+          .from(DATASET)
+          .leftJoin(USER)
+          .on(USER.UID.eq(DATASET.OWNER_UID))
+          .where(USER.EMAIL.eq(ownerEmail))
+          .and(DATASET.NAME.eq(datasetName))
+          .fetchOneInto(classOf[Dataset])
+
+        // fetch the dataset version from DB
+        val datasetVersion = ctx
+          .selectFrom(DATASET_VERSION)
+          .where(DATASET_VERSION.DID.eq(dataset.getDid))
+          .and(DATASET_VERSION.NAME.eq(versionName))
+          .fetchOneInto(classOf[DatasetVersion])
+
+        if (dataset == null || datasetVersion == null) {
+          throw new FileNotFoundException(s"Dataset directory $directoryName not found.")
+        }
+        (dataset, datasetVersion)
+      }
+
+    // Build the format /{datasetName}/{versionHash}/, both Linux and Windows use forward slash as the splitter
+    val uriSplitter = "/"
+    val encodedPath =
+      uriSplitter + datasetName + uriSplitter + datasetVersion.getVersionHash + uriSplitter
+
+    try {
+      new URI(DATASET_FILE_URI_SCHEME, "", encodedPath, null)
+    } catch {
+      case e: Exception =>
+        throw new FileNotFoundException(s"Dataset directory $directoryName not found.")
     }
   }
 

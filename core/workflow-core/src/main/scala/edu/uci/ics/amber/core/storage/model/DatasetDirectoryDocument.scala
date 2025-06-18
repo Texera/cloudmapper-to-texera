@@ -92,6 +92,7 @@ class DatasetDirectoryDocument(fileFullPath: Path, shouldContainFile: Boolean = 
   }
 
   def asDirectory(): String = {
+
     PathUtils.getDatasetPath(dataset.getDid).toString
   }
 }

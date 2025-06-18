@@ -33,6 +33,7 @@ import java.io.{File, FileOutputStream, InputStream}
 import java.net.{HttpURLConnection, URI, URL, URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
+import java.util.zip.{ZipEntry, ZipOutputStream}
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 object DatasetFileDocument {
@@ -52,7 +53,7 @@ object DatasetFileDocument {
       .trim
 }
 
-private[storage] class DatasetFileDocument(uri: URI)
+private[storage] class DatasetFileDocument(uri: URI, isDirectory: Boolean = false)
     extends VirtualDocument[Nothing]
     with OnDataset
     with LazyLogging {
@@ -142,24 +143,48 @@ private[storage] class DatasetFileDocument(uri: URI)
     tempFile match {
       case Some(file) => file
       case None =>
-        val tempFilePath = Files.createTempFile("versionedFile", ".tmp")
-        val tempFileStream = new FileOutputStream(tempFilePath.toFile)
-        val inputStream = asInputStream()
+        if (isDirectory) {
+          // Create a zip file containing all files in the directory
+          val tempZipPath = Files.createTempFile("versionedDirectory", ".zip")
+          val zipOutputStream = new ZipOutputStream(new FileOutputStream(tempZipPath.toFile))
 
-        val buffer = new Array[Byte](1024)
+          try {
+            // Get all files in the directory and add them to the zip
+            addDirectoryToZip(
+              zipOutputStream,
+              "",
+              getDatasetName(),
+              getVersionHash(),
+              fileRelativePath
+            )
+          } finally {
+            zipOutputStream.close()
+          }
 
-        // Create an iterator to repeatedly call inputStream.read, and direct buffered data to file
-        Iterator
-          .continually(inputStream.read(buffer))
-          .takeWhile(_ != -1)
-          .foreach(tempFileStream.write(buffer, 0, _))
+          val file = tempZipPath.toFile
+          tempFile = Some(file)
+          file
+        } else {
+          // Handle single file case
+          val tempFilePath = Files.createTempFile("versionedFile", ".tmp")
+          val tempFileStream = new FileOutputStream(tempFilePath.toFile)
+          val inputStream = asInputStream()
 
-        inputStream.close()
-        tempFileStream.close()
+          val buffer = new Array[Byte](1024)
 
-        val file = tempFilePath.toFile
-        tempFile = Some(file)
-        file
+          // Create an iterator to repeatedly call inputStream.read, and direct buffered data to file
+          Iterator
+            .continually(inputStream.read(buffer))
+            .takeWhile(_ != -1)
+            .foreach(tempFileStream.write(buffer, 0, _))
+
+          inputStream.close()
+          tempFileStream.close()
+
+          val file = tempFilePath.toFile
+          tempFile = Some(file)
+          file
+        }
     }
   }
 
@@ -181,4 +206,171 @@ private[storage] class DatasetFileDocument(uri: URI)
   override def getDatasetName(): String = datasetName
 
   override def getFileRelativePath(): String = fileRelativePath.toString
+
+  /**
+    * Adds all files from a directory (and its subdirectories) to a zip output stream.
+    *
+    * @param zipOutputStream The zip output stream to write to
+    * @param datasetName The name of the dataset
+    * @param versionHash The version hash of the dataset
+    * @param directoryPath The relative path of the directory in the dataset
+    */
+  private def addDirectoryToZip(
+      zipOutputStream: ZipOutputStream,
+      basePath: String,
+      datasetName: String,
+      versionHash: String,
+      directoryPath: Path
+  ): Unit = {
+    try {
+      // Get all files in the repository from LakeFS
+      val allObjects = LakeFSStorageClient.retrieveObjectsOfVersion(datasetName, versionHash)
+      val directoryPathStr = directoryPath.toString.replace("\\", "/")
+
+      // Filter objects that are within the specified directory (including subdirectories)
+      val objectsInDirectory = allObjects.filter { obj =>
+        val objPath = obj.getPath
+        if (directoryPathStr.isEmpty) {
+          true // Include all files if directory path is empty (root)
+        } else {
+          objPath.startsWith(directoryPathStr + "/") || objPath == directoryPathStr
+        }
+      }
+
+      objectsInDirectory.foreach { obj =>
+        val objPath = obj.getPath
+        val relativePath = if (directoryPathStr.isEmpty) {
+          if (basePath.isEmpty) objPath else s"$basePath/$objPath"
+        } else {
+          val filePathWithinDirectory = objPath.substring(directoryPathStr.length).stripPrefix("/")
+          if (basePath.isEmpty) filePathWithinDirectory else s"$basePath/$filePathWithinDirectory"
+        }
+
+        // Skip if the relative path is empty (this would be the directory itself)
+        if (relativePath.nonEmpty) {
+          // Add file to zip
+          val zipEntry = new ZipEntry(relativePath)
+          zipOutputStream.putNextEntry(zipEntry)
+
+          // Get file content and write to zip
+          val fileInputStream = getFileInputStreamFromLakeFS(datasetName, versionHash, objPath)
+          val buffer = new Array[Byte](1024)
+
+          try {
+            Iterator
+              .continually(fileInputStream.read(buffer))
+              .takeWhile(_ != -1)
+              .foreach(zipOutputStream.write(buffer, 0, _))
+          } finally {
+            fileInputStream.close()
+          }
+
+          zipOutputStream.closeEntry()
+        }
+      }
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Error adding directory to zip: ${e.getMessage}", e)
+        // Fallback: try to get files using alternative method
+        addDirectoryToZipFallback(
+          zipOutputStream,
+          basePath,
+          datasetName,
+          versionHash,
+          directoryPath
+        )
+    }
+  }
+
+  /**
+    * Fallback method to add directory files to zip using local file system access.
+    */
+  private def addDirectoryToZipFallback(
+      zipOutputStream: ZipOutputStream,
+      basePath: String,
+      datasetName: String,
+      versionHash: String,
+      directoryPath: Path
+  ): Unit = {
+    try {
+      // Use GitVersionControlLocalFileStorage as fallback
+      val datasetPath =
+        PathUtils.getDatasetPath(0) // This might need to be adjusted based on actual dataset ID
+      val fullDirectoryPath = datasetPath.resolve(directoryPath)
+
+      if (Files.exists(fullDirectoryPath) && Files.isDirectory(fullDirectoryPath)) {
+        Files.walk(fullDirectoryPath).forEach { filePath =>
+          if (!Files.isDirectory(filePath)) {
+            val relativePath = datasetPath.relativize(filePath).toString.replace("\\", "/")
+            val zipRelativePath = if (basePath.isEmpty) {
+              directoryPath.relativize(datasetPath.relativize(filePath)).toString.replace("\\", "/")
+            } else {
+              s"$basePath/${directoryPath.relativize(datasetPath.relativize(filePath)).toString.replace("\\", "/")}"
+            }
+
+            val zipEntry = new ZipEntry(zipRelativePath)
+            zipOutputStream.putNextEntry(zipEntry)
+
+            val fileInputStream =
+              GitVersionControlLocalFileStorage.retrieveFileContentOfVersionAsInputStream(
+                datasetPath,
+                versionHash,
+                filePath
+              )
+
+            val buffer = new Array[Byte](1024)
+            try {
+              Iterator
+                .continually(fileInputStream.read(buffer))
+                .takeWhile(_ != -1)
+                .foreach(zipOutputStream.write(buffer, 0, _))
+            } finally {
+              fileInputStream.close()
+            }
+
+            zipOutputStream.closeEntry()
+          }
+        }
+      }
+    } catch {
+      case e: Exception =>
+        logger.error(s"Fallback method also failed for directory zipping: ${e.getMessage}", e)
+        throw new RuntimeException(s"Failed to create zip file for directory: ${directoryPath}", e)
+    }
+  }
+
+  /**
+    * Gets an input stream for a file from LakeFS.
+    */
+  private def getFileInputStreamFromLakeFS(
+      datasetName: String,
+      versionHash: String,
+      filePath: String
+  ): InputStream = {
+    if (userJwtToken.isEmpty) {
+      val presignUrl = LakeFSStorageClient.getFilePresignedUrl(datasetName, versionHash, filePath)
+      new URL(presignUrl).openStream()
+    } else {
+      val presignRequestUrl =
+        s"$fileServiceGetPresignURLEndpoint?datasetName=${datasetName}&commitHash=${versionHash}&filePath=${URLEncoder
+          .encode(filePath, StandardCharsets.UTF_8.name())}"
+
+      val connection = new URL(presignRequestUrl).openConnection().asInstanceOf[HttpURLConnection]
+      connection.setRequestMethod("GET")
+      connection.setRequestProperty("Authorization", s"Bearer $userJwtToken")
+
+      if (connection.getResponseCode != HttpURLConnection.HTTP_OK) {
+        throw new RuntimeException(
+          s"Failed to retrieve presigned URL: HTTP ${connection.getResponseCode}"
+        )
+      }
+
+      val responseBody =
+        new String(connection.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+      val presignedUrl = responseBody.split("\"presignedUrl\"\\s*:\\s*\"")(1).split("\"")(0)
+
+      connection.disconnect()
+      new URL(presignedUrl).openStream()
+    }
+  }
 }
