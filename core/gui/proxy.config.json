@@ -40,5 +40,11 @@
     "ws": true,
     "secure": false,
     "changeOrigin": false
+  },
+  "/chat-assistant": {
+    "target": "http://localhost:8081",
+    "secure": false,
+    "changeOrigin": false,
+    "ws": true
   }
 }
