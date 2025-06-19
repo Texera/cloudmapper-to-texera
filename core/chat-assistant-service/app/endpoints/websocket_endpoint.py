@@ -128,7 +128,7 @@ _HANDLER_MAP = {
 }
 
 
-@router.websocket("/ws")
+@router.websocket("/chat-assistant")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     sessions: Dict[str, AgentService] = {}

@@ -72,7 +72,7 @@ export const WS_RECONNECT_INTERVAL_MS = 3000;
   providedIn: "root",
 })
 export class ChatAssistantWebsocketService {
-  private static readonly WS_ENDPOINT = "chat-assistant/ws";
+  private static readonly WS_ENDPOINT = "chat-assistant";
   private websocket?: WebSocketSubject<PythonWSEvent | PythonWSRequest>;
   private wsWithReconnectSubscription?: Subscription;
   private webSocketResponseSubject: Subject<PythonWSEvent> = new Subject<PythonWSEvent>();
