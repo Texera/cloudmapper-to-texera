@@ -45,7 +45,7 @@ export class DirectoryPathInputComponent extends FieldType<FieldTypeConfig> {
   }
 
   get isDirectorySelectionEnabled(): boolean {
-    return environment.userSystemEnabled;
+    return true;
   }
 
   get selectedDirectoryPath(): string | null {

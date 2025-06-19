@@ -42,6 +42,6 @@ export class ClusterAutoCompleteComponent extends FieldType<FieldTypeConfig> {
       });
   }
   get isClusterSelectionEnabled(): boolean {
-    return environment.userSystemEnabled;
+    return true;
   }
 }

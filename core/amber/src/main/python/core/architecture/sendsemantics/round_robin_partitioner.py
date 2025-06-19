@@ -17,18 +17,17 @@
 
 import typing
 from typing import Iterator
-
 from overrides import overrides
-
 from core.architecture.sendsemantics.partitioner import Partitioner
 from core.models import Tuple
-from core.models.marker import Marker
+from core.models.state import State
 from core.util import set_one_of
 from proto.edu.uci.ics.amber.engine.architecture.sendsemantics import (
     Partitioning,
     RoundRobinPartitioning,
 )
 from proto.edu.uci.ics.amber.core import ActorVirtualIdentity
+from proto.edu.uci.ics.amber.engine.architecture.rpc import EmbeddedControlMessage
 
 
 class RoundRobinPartitioner(Partitioner):
@@ -63,23 +62,23 @@ class RoundRobinPartitioner(Partitioner):
 
     @overrides
     def flush(
-        self, to: ActorVirtualIdentity, marker: Marker
-    ) -> Iterator[typing.Union[Marker, typing.List[Tuple]]]:
+        self, to: ActorVirtualIdentity, ecm: EmbeddedControlMessage
+    ) -> Iterator[typing.Union[EmbeddedControlMessage, typing.List[Tuple]]]:
         for receiver, batch in self.receivers:
             if receiver == to:
                 if len(batch) > 0:
                     yield batch
                     batch.clear()
-                yield marker
+                yield ecm
 
     @overrides
-    def flush_marker(
-        self, marker: Marker
+    def flush_state(
+        self, state: State
     ) -> Iterator[
-        typing.Tuple[ActorVirtualIdentity, typing.Union[Marker, typing.List[Tuple]]]
+        typing.Tuple[ActorVirtualIdentity, typing.Union[State, typing.List[Tuple]]]
     ]:
         for receiver, batch in self.receivers:
             if len(batch) > 0:
                 yield receiver, batch
                 batch.clear()
-            yield receiver, marker
+            yield receiver, state
