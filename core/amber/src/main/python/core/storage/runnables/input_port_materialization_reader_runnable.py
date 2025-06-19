@@ -33,14 +33,17 @@ from core.architecture.sendsemantics.range_based_shuffle_partitioner import (
 from core.architecture.sendsemantics.round_robin_partitioner import (
     RoundRobinPartitioner,
 )
-from core.models import Tuple, InternalQueue, DataFrame, MarkerFrame, DataPayload
-from core.models.internal_queue import DataElement
-from core.models.marker import StartOfInputChannel, EndOfInputChannel, Marker
+from core.models import Tuple, InternalQueue, DataFrame, DataPayload
+from core.models.internal_queue import DataElement, EmbeddedControlMessageElement
 from core.storage.document_factory import DocumentFactory
 from core.util import Stoppable, get_one_of
 from core.util.runnable.runnable import Runnable
 from core.util.virtual_identity import get_from_actor_id_for_input_port_storage
-from proto.edu.uci.ics.amber.core import ActorVirtualIdentity, ChannelIdentity
+from proto.edu.uci.ics.amber.core import (
+    ActorVirtualIdentity,
+    ChannelIdentity,
+    EmbeddedControlMessageIdentity,
+)
 from proto.edu.uci.ics.amber.engine.architecture.sendsemantics import (
     HashBasedShufflePartitioning,
     OneToOnePartitioning,
@@ -50,6 +53,15 @@ from proto.edu.uci.ics.amber.engine.architecture.sendsemantics import (
     BroadcastPartitioning,
 )
 from loguru import logger
+from typing import Union
+from proto.edu.uci.ics.amber.engine.architecture.rpc import (
+    ControlInvocation,
+    EmptyRequest,
+    EmbeddedControlMessageType,
+    EmbeddedControlMessage,
+    AsyncRpcContext,
+    ControlRequest,
+)
 
 
 class InputPortMaterializationReaderRunnable(Runnable, Stoppable):
@@ -77,6 +89,7 @@ class InputPortMaterializationReaderRunnable(Runnable, Stoppable):
             from_actor_id, self.worker_actor_id, is_control=False
         )
         self._stopped = False
+        self._finished = False
         self.materialization = None
         self.tuple_schema = None
         self._partitioning_to_partitioner: dict[
@@ -96,6 +109,12 @@ class InputPortMaterializationReaderRunnable(Runnable, Stoppable):
             else partitioner(the_partitioning, self.worker_actor_id)
         )
 
+    def finished(self) -> bool:
+        """
+        :return: Whether this reader thread has finished its logic.
+        """
+        return self._finished
+
     def tuple_to_batch_with_filter(self, tuple_: Tuple) -> typing.Iterator[DataFrame]:
         """
         Let the partitioner produce batches to each (hypothetical) downstream
@@ -110,8 +129,8 @@ class InputPortMaterializationReaderRunnable(Runnable, Stoppable):
     def run(self) -> None:
         """
         Main execution logic that reads tuples from the materialized storage and
-        enqueues them in batches. It first emits a start marker and, when finished,
-        emits an end marker. Use the same partitioner implementation as that in
+        enqueues them in batches. It first emits a StartChannel ECM and, when finished,
+        emits an EndChannel ECM. Use the same partitioner implementation as that in
         output manager, where a tuple is batched by the partitioner and only
         selected as the input of this worker according to the partitioner.
         """
@@ -119,7 +138,7 @@ class InputPortMaterializationReaderRunnable(Runnable, Stoppable):
             self.materialization, self.tuple_schema = DocumentFactory.open_document(
                 self.uri
             )
-            self.emit_marker(StartOfInputChannel())
+            self.emit_ecm("StartChannel", EmbeddedControlMessageType.NO_ALIGNMENT)
             storage_iterator = self.materialization.get()
 
             # Iterate and process tuples.
@@ -130,7 +149,8 @@ class InputPortMaterializationReaderRunnable(Runnable, Stoppable):
                 # a batch-based iterator.
                 for data_frame in self.tuple_to_batch_with_filter(tup):
                     self.emit_payload(data_frame)
-            self.emit_marker(EndOfInputChannel())
+            self.emit_ecm("EndChannel", EmbeddedControlMessageType.PORT_ALIGNMENT)
+            self._finished = True
         except Exception as err:
             logger.exception(err)
 
@@ -138,28 +158,42 @@ class InputPortMaterializationReaderRunnable(Runnable, Stoppable):
         """Sets the stop flag so the run loop may terminate."""
         self._stopped = True
 
-    def emit_marker(self, marker: Marker) -> None:
+    def emit_ecm(self, method_name: str, alignment: EmbeddedControlMessageType) -> None:
         """
-        Emit a marker (StartOfInputChannel or EndOfInputChannel), and
+        Emit an ECM (StartChannel or EndChannel), and
         flush the remaining data batches if any. This mimics the
         iterator logic of that in output manager.
         """
-        for receiver, payload in self.partitioner.flush_marker(marker=marker):
-            if receiver == self.worker_actor_id:
-                final_payload = (
-                    MarkerFrame(payload)
-                    if isinstance(payload, Marker)
-                    else self.tuples_to_data_frame(payload)
+        ecm = EmbeddedControlMessage(
+            EmbeddedControlMessageIdentity(method_name),
+            alignment,
+            [],
+            {
+                self.worker_actor_id.name: ControlInvocation(
+                    method_name,
+                    ControlRequest(empty_request=EmptyRequest()),
+                    AsyncRpcContext(ActorVirtualIdentity(), ActorVirtualIdentity()),
+                    -1,
                 )
-                self.emit_payload(final_payload)
+            },
+        )
 
-    def emit_payload(self, payload: DataPayload) -> None:
+        for payload in self.partitioner.flush(self.worker_actor_id, ecm):
+            final_payload = (
+                payload
+                if isinstance(payload, EmbeddedControlMessage)
+                else self.tuples_to_data_frame(payload)
+            )
+            self.emit_payload(final_payload)
+
+    def emit_payload(self, payload: Union[DataPayload, EmbeddedControlMessage]) -> None:
         """
         Put the payload to the DP internal queue.
         """
-        queue_element = DataElement(
-            tag=self.channel_id,
-            payload=payload,
+        queue_element = (
+            EmbeddedControlMessageElement(tag=self.channel_id, payload=payload)
+            if isinstance(payload, EmbeddedControlMessage)
+            else DataElement(tag=self.channel_id, payload=payload)
         )
         self.queue.put(queue_element)
 
