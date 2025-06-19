@@ -18,31 +18,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-{{ .Values.microservices.chatAssistantService.name }}
+  name: {{ .Release.Name }}-{{ .Values.chatAssistantService.name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}-{{ .Values.microservices.chatAssistantService.name }}
+    app: {{ .Release.Name }}-{{ .Values.chatAssistantService.name }}
 spec:
-  replicas: {{ .Values.microservices.chatAssistantService.numOfPods }}
+  replicas: {{ .Values.chatAssistantService.numOfPods }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-{{ .Values.microservices.chatAssistantService.name }}
+      app: {{ .Release.Name }}-{{ .Values.chatAssistantService.name }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-{{ .Values.microservices.chatAssistantService.name }}
+        app: {{ .Release.Name }}-{{ .Values.chatAssistantService.name }}
     spec:
       containers:
-          - name: {{ .Values.microservices.chatAssistantService.name }}
-            image: {{ .Values.microservices.chatAssistantService.imageName }}
+          - name: {{ .Values.chatAssistantService.name }}
+            image: {{ .Values.chatAssistantService.imageName }}
             imagePullPolicy: {{ .Values.texeraImages.pullPolicy }}
             ports:
-              - containerPort: {{ .Values.microservices.chatAssistantService.service.port }}
+              - containerPort: {{ .Values.chatAssistantService.service.port }}
             env:
               - name: STORAGE_JDBC_URL
                 value: jdbc:postgresql://{{ .Release.Name }}-postgresql:5432/texera_db?currentSchema=texera_db,public
               - name: OPENAI_API_KEY
-                value: {{ .Values.microservices.chatAssistantService.apiKey }}
+                value: {{ .Values.chatAssistantService.apiKey }}
               - name: STORAGE_JDBC_PASSWORD
                 valueFrom:
                   secretKeyRef:
@@ -51,12 +51,12 @@ spec:
             livenessProbe:
               httpGet:
                 path: /api/healthcheck
-                port: {{ .Values.microservices.chatAssistantService.service.port }}
+                port: {{ .Values.chatAssistantService.service.port }}
               initialDelaySeconds: 30
               periodSeconds: 10
             readinessProbe:
               httpGet:
                 path: /api/healthcheck
-                port: {{ .Values.microservices.chatAssistantService.service.port }}
+                port: {{ .Values.chatAssistantService.service.port }}
               initialDelaySeconds: 5
               periodSeconds: 5

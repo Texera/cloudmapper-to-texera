@@ -42,7 +42,7 @@
     "changeOrigin": false
   },
   "/chat-assistant": {
-    "target": "http://localhost:8081",
+    "target": "http://localhost:8001",
     "secure": false,
     "changeOrigin": false,
     "ws": true

@@ -158,13 +158,13 @@ configService:
     port: 9094
 
 
-chatAssistant:
+chatAssistantService:
   name: chat-assistant-service
   numOfPods: 1
   imageName: texera/chat-assistant-service:cluster   # <─ use the cluster tag
   service:
     type: ClusterIP
-    port: 8081
+    port: 8001
   apiKey: ""
 
 # Configs of the envoy proxy, used to routerequests to the computing units
@@ -345,7 +345,7 @@ ingressPaths:
       servicePort: 3000
     - path: /chat-assistant
       serviceName: chat-assistant-service-svc
-      servicePort: 8081
+      servicePort: 8001
     - path: /
       serviceName: webserver-svc
       servicePort: 8080
