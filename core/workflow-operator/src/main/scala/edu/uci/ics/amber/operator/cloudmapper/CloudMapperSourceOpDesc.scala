@@ -8,7 +8,6 @@ import edu.uci.ics.amber.core.workflow.{OutputPort, PortIdentity}
 import edu.uci.ics.amber.operator.metadata.{OperatorGroupConstants, OperatorInfo}
 import edu.uci.ics.amber.operator.source.PythonSourceOperatorDescriptor
 import edu.uci.ics.texera.workflow.operators.cloudmapper.{ReferenceGenome, ReferenceGenomeEnum}
-import edu.uci.ics.amber.operator.util.OperatorFilePathUtils
 
 class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
   @JsonProperty(required = true)
@@ -29,7 +28,7 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
   @JsonPropertyDescription("Cluster")
   val cluster: String = ""
 
-  private var clusterLauncherServiceTarget: String = "http://localhost:4000"
+  private var clusterLauncherServiceTarget: String = "http://localhost:3000"
 
   // Getter to retrieve only the id part (cid) from the cluster
   def clusterId: String = {
@@ -65,8 +64,9 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
     val pythonFastaFiles = (referenceGenome :: additionalReferenceGenomes)
       .flatMap(_.fastAFiles)
       .map(file => {
-        val (filepath, fileDesc) = OperatorFilePathUtils.determineFilePathOrDatasetFile(Some(file))
-        val fastAFilePath = if (filepath != null) filepath else fileDesc.asFile().toPath.toString
+        val fileUri = FileResolver.resolve(file)
+        val fileDocument = DocumentFactory.openReadonlyDocument(fileUri, isDirectory = false)
+        val fastAFilePath = fileDocument.asFile().getAbsolutePath
         s"open(r'$fastAFilePath', 'rb')"
       })
       .mkString("[", ", ", "]")
@@ -76,8 +76,9 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
       .find(_.referenceGenome == ReferenceGenomeEnum.MY_REFERENCE)
       .flatMap(_.gtfFile)
       .map(file => {
-        val (filepath, fileDesc) = OperatorFilePathUtils.determineFilePathOrDatasetFile(Some(file))
-        val gtfFilePath = if (filepath != null) filepath else fileDesc.asFile().toPath.toString
+        val fileUri = FileResolver.resolve(file)
+        val fileDocument = DocumentFactory.openReadonlyDocument(fileUri, isDirectory = false)
+        val gtfFilePath = fileDocument.asFile().getAbsolutePath
         s"open(r'$gtfFilePath', 'rb')"
       })
       .getOrElse("")

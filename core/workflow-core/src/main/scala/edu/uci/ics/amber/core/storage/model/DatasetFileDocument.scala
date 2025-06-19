@@ -60,12 +60,15 @@ private[storage] class DatasetFileDocument(uri: URI, isDirectory: Boolean = fals
   // Utility function to parse and decode URI segments into individual components
   private def parseUri(uri: URI): (String, String, Path) = {
     val segments = Paths.get(uri.getPath).iterator().asScala.map(_.toString).toArray
-    if (segments.length < 3)
+    if (!isDirectory && segments.length < 3)
       throw new IllegalArgumentException("URI format is incorrect")
 
     // TODO: consider whether use dataset name or did
     val datasetName = segments(0)
     val datasetVersionHash = URLDecoder.decode(segments(1), StandardCharsets.UTF_8)
+    if (isDirectory) {
+      return (datasetName, datasetVersionHash, Paths.get(""))
+    }
     val decodedRelativeSegments =
       segments.drop(2).map(part => URLDecoder.decode(part, StandardCharsets.UTF_8))
     val fileRelativePath = Paths.get(decodedRelativeSegments.head, decodedRelativeSegments.tail: _*)
