@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudmapper
+  namespace: texera
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudmapper
+  template:
+    metadata:
+      labels:
+        app: cloudmapper
+    spec:
+      volumes:
+        - name: cloudmapper-file-volume
+          persistentVolumeClaim:
+            claimName: cloudmapper-pvc
+        - name: aws-config-volume
+          emptyDir: {}
+        - name: ssh-key-volume
+          secret:
+            secretName: ssh-key
+            defaultMode: 0600  # Secure SSH key permissions
+
+      initContainers:
+        - name: aws-config-setup
+          image: ubuntu:22.04
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              mkdir -p /aws-config;
+              echo "[default]" > /aws-config/credentials;
+              echo "aws_access_key_id = $AWS_ACCESS_KEY_ID" >> /aws-config/credentials;
+              echo "aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" >> /aws-config/credentials;
+              echo "[default]" > /aws-config/config;
+              echo "region = us-west-2" >> /aws-config/config;
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_SECRET_ACCESS_KEY
+          volumeMounts:
+            - name: aws-config-volume
+              mountPath: /aws-config
+
+      containers:
+        - name: cloudmapper
+          image: kunwp1/cloudmapper:latest
+          ports:
+            - containerPort: 4000
+          volumeMounts:
+            - name: cloudmapper-file-volume
+              mountPath: "/data"
+            - name: aws-config-volume
+              mountPath: /root/.aws
+            - name: ssh-key-volume
+              mountPath: /root/.ssh
+              readOnly: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudmapper-service
+  namespace: texera
+spec:
+  selector:
+    app: cloudmapper
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+  type: ClusterIP
+
