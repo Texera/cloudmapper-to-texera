@@ -24,7 +24,7 @@ while true; do
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting uvicorn…" >&2
   uvicorn main:app \
     --host 0.0.0.0 \
-    --port 9095 \
+    --port 8001 \
     --reload
 
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Uvicorn exited; restarting in 60 minutes…" >&2
