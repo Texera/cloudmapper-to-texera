@@ -21,7 +21,7 @@ object ClusterServiceClient {
       machineType: String,
       numberOfMachines: Int
   ): Either[String, String] = {
-    val url = new URL(s"${AmberConfig.clusterLauncherServiceTarget}/api/cluster/create")
+    val url = new URL(s"http://cloudmapper-service:4000/api/cluster/create")
     val jsonInputString =
       s"""{
          |"provider": "aws",
@@ -40,7 +40,7 @@ object ClusterServiceClient {
     * @return Either an error message in Left, or the response body in Right.
     */
   def callDeleteClusterAPI(clusterId: Int): Either[String, String] = {
-    val url = new URL(s"${AmberConfig.clusterLauncherServiceTarget}/api/cluster/$clusterId")
+    val url = new URL(s"http://cloudmapper-service:4000/api/cluster/$clusterId")
     sendHttpRequest("DELETE", url, None)
   }
 
@@ -51,7 +51,7 @@ object ClusterServiceClient {
     * @return Either an error message in Left, or the response body in Right.
     */
   def callPauseClusterAPI(clusterId: Int): Either[String, String] = {
-    val url = new URL(s"${AmberConfig.clusterLauncherServiceTarget}/api/cluster/$clusterId")
+    val url = new URL(s"http://cloudmapper-service:4000/api/cluster/$clusterId")
     sendHttpRequest("PUT", url, None)
   }
 
@@ -62,7 +62,7 @@ object ClusterServiceClient {
     * @return Either an error message in Left, or the response body in Right.
     */
   def callResumeClusterAPI(clusterId: Int): Either[String, String] = {
-    val url = new URL(s"${AmberConfig.clusterLauncherServiceTarget}/api/cluster/resume/$clusterId")
+    val url = new URL(s"http://cloudmapper-service:4000/api/cluster/resume/$clusterId")
     sendHttpRequest("POST", url, None)
   }
 
