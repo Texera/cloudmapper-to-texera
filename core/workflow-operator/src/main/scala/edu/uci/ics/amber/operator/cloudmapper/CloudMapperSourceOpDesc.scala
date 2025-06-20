@@ -28,7 +28,7 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
   @JsonPropertyDescription("Cluster")
   val cluster: String = ""
 
-  private var clusterLauncherServiceTarget: String = "http://cloudmapper-service:4000"
+  private var clusterLauncherServiceTarget: String = "http://cloudmapper-service.texera.svc.cluster.local:4000"
 
   // Getter to retrieve only the id part (cid) from the cluster
   def clusterId: String = {
