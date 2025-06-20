@@ -42,6 +42,8 @@ spec:
             # FileService Access
             - name: FILE_SERVICE_GET_PRESIGNED_URL_ENDPOINT
               value: http://{{ .Values.fileService.name }}-svc:9092/api/dataset/presign-download
+            - name: FILE_SERVICE_LIST_DIRECTORY_OBJECTS_ENDPOINT
+              value: http://{{ .Values.fileService.name }}-svc:9092/api/dataset/list-directory-objects
             # LakeFS Access
             - name: STORAGE_LAKEFS_ENDPOINT
               value: http://{{ .Release.Name }}-lakefs:8000/api/v1

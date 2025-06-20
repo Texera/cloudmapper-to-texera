@@ -1,7 +1,5 @@
 package edu.uci.ics.texera.web.resource.dashboard.user.cluster
 
-import edu.uci.ics.amber.engine.common.AmberConfig
-
 import java.net.{HttpURLConnection, URL}
 import scala.io.Source
 import scala.util.{Failure, Success, Try}

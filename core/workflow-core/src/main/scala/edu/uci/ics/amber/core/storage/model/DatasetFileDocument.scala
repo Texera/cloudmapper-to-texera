@@ -23,6 +23,7 @@ import com.typesafe.scalalogging.LazyLogging
 import edu.uci.ics.amber.config.EnvironmentalVariable
 import edu.uci.ics.amber.core.storage.model.DatasetFileDocument.{
   fileServiceGetPresignURLEndpoint,
+  fileServiceListDirectoryObjectsEndpoint,
   userJwtToken
 }
 import edu.uci.ics.amber.core.storage.util.LakeFSStorageClient
@@ -49,6 +50,15 @@ object DatasetFileDocument {
       .getOrElse(
         EnvironmentalVariable.ENV_FILE_SERVICE_GET_PRESIGNED_URL_ENDPOINT,
         "http://localhost:9092/api/dataset/presign-download"
+      )
+      .trim
+
+  // The endpoint for listing directory objects from the file service.
+  lazy val fileServiceListDirectoryObjectsEndpoint: String =
+    sys.env
+      .getOrElse(
+        EnvironmentalVariable.ENV_FILE_SERVICE_LIST_DIRECTORY_OBJECTS_ENDPOINT,
+        "http://localhost:9092/api/dataset/list-directory-objects"
       )
       .trim
 }
@@ -226,8 +236,15 @@ private[storage] class DatasetFileDocument(uri: URI, isDirectory: Boolean = fals
       directoryPath: Path
   ): Unit = {
     try {
-      // Get all files in the repository from LakeFS
-      val allObjects = LakeFSStorageClient.retrieveObjectsOfVersion(datasetName, versionHash)
+      // Get all files in the repository
+      val allObjects = if (userJwtToken.nonEmpty) {
+        // Use FileService endpoint when JWT token is available
+        getDirectoryObjectsViaFileService(datasetName, versionHash)
+      } else {
+        // Fallback to direct LakeFS access
+        LakeFSStorageClient.retrieveObjectsOfVersion(datasetName, versionHash)
+      }
+
       val directoryPathStr = directoryPath.toString.replace("\\", "/")
 
       // Filter objects that are within the specified directory (including subdirectories)
@@ -282,6 +299,62 @@ private[storage] class DatasetFileDocument(uri: URI, isDirectory: Boolean = fals
           versionHash,
           directoryPath
         )
+    }
+  }
+
+  /**
+    * Gets directory objects via FileService when JWT token is available.
+    */
+  private def getDirectoryObjectsViaFileService(
+      datasetName: String,
+      versionHash: String
+  ): List[io.lakefs.clients.sdk.model.ObjectStats] = {
+    val requestUrl =
+      s"$fileServiceListDirectoryObjectsEndpoint?datasetName=${URLEncoder.encode(datasetName, StandardCharsets.UTF_8.name())}&commitHash=${URLEncoder
+        .encode(versionHash, StandardCharsets.UTF_8.name())}"
+
+    val connection = new URL(requestUrl).openConnection().asInstanceOf[HttpURLConnection]
+    connection.setRequestMethod("GET")
+    connection.setRequestProperty("Authorization", s"Bearer $userJwtToken")
+
+    try {
+      if (connection.getResponseCode != HttpURLConnection.HTTP_OK) {
+        throw new RuntimeException(
+          s"Failed to list directory objects: HTTP ${connection.getResponseCode}"
+        )
+      }
+
+      // Read response body as a string
+      val responseBody =
+        new String(connection.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+
+      // Parse JSON response to extract objects
+      // Expecting format: {"objects": [{"path": "...", "sizeBytes": ...}, ...]}
+      val objectsStartPattern = """"objects"\s*:\s*\[""".r
+      val objectPattern = """\{"path"\s*:\s*"([^"]+)"\s*,\s*"sizeBytes"\s*:\s*(\d+)\}""".r
+
+      val objectMatches = objectPattern.findAllMatchIn(responseBody).toList
+      objectMatches.map { matchObj =>
+        val path = matchObj.group(1)
+        val sizeBytes = matchObj.group(2).toLong
+
+        // Create a mock ObjectStats object since we only need path and size
+        val objectStats = new io.lakefs.clients.sdk.model.ObjectStats()
+        objectStats.setPath(path)
+        objectStats.setSizeBytes(sizeBytes)
+        objectStats
+      }
+
+    } catch {
+      case e: Exception =>
+        logger.warn(
+          s"Failed to get directory objects via FileService: ${e.getMessage}. Falling back to direct LakeFS.",
+          e
+        )
+        // Fallback to direct LakeFS access
+        LakeFSStorageClient.retrieveObjectsOfVersion(datasetName, versionHash)
+    } finally {
+      connection.disconnect()
     }
   }
 
