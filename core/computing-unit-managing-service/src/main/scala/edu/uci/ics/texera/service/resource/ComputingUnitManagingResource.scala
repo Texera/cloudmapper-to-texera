@@ -410,7 +410,10 @@ class ComputingUnitManagingResource {
           param.gpuLimit,
           computingUnitEnvironmentVariables ++ Map(
             EnvironmentalVariable.ENV_USER_JWT_TOKEN -> userToken,
-            EnvironmentalVariable.ENV_JAVA_OPTS -> s"-Xmx${param.jvmMemorySize}"
+            EnvironmentalVariable.ENV_JAVA_OPTS -> s"-Xmx${param.jvmMemorySize}",
+            EnvironmentalVariable.ENV_LAKEFS_AUTH_USERNAME -> StorageConfig.lakefsUsername,
+            EnvironmentalVariable.ENV_LAKEFS_AUTH_PASSWORD -> StorageConfig.lakefsPassword,
+            EnvironmentalVariable.ENV_LAKEFS_ENDPOINT -> StorageConfig.lakefsEndpoint
           ),
           Some(param.shmSize)
         )
