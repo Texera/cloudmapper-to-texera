@@ -82,7 +82,7 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
         val gtfFilePath = fileDocument.asFile().getAbsolutePath
         s"open(r'$gtfFilePath', 'rb')"
       })
-      .getOrElse("")
+      .getOrElse("None")
 
     s"""from pytexera import *
        |
@@ -128,7 +128,7 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |        job_form = {
        |            'referenceGenome': ${pythonAllReferenceGenomes},
        |            'fastaFiles': ${pythonFastaFiles} if 'My Reference' in ${pythonAllReferenceGenomes} else [],
-       |            'gtfFile': ${pythonGtfFile}
+       |            'gtfFile': ${pythonGtfFile} if ${pythonGtfFile} != "None" else None
        |        }
        |
        |        # Create form data and files based on the provided job_form
