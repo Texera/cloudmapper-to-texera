@@ -124,13 +124,15 @@ export class ClusterComponent implements OnInit, OnDestroy {
   getBadgeStatus(status: string): string[] {
     switch (status) {
       case "PENDING":
-      case "STOPPING":
-      case "SHUTTING_DOWN":
       case "LAUNCH_RECEIVED":
-      case "TERMINATE_RECEIVED":
-      case "STOP_RECEIVED":
       case "START_RECEIVED":
-        return ["loading", "processing"];
+        return ["loading", "gold"];
+      case "STOPPING":
+      case "STOP_RECEIVED":
+        return ["pause-circle", "orange"];
+      case "SHUTTING_DOWN":
+      case "TERMINATE_RECEIVED":
+        return ["delete", "red"];
       case "RUNNING":
         return ["check-circle", "green"];
       case "STOPPED":
