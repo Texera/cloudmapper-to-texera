@@ -247,11 +247,6 @@ class DatasetResource {
       val isDatasetPublic = request.isDatasetPublic
       val isDatasetDownloadable = request.isDatasetDownloadable
 
-      // Validate business rule: downloadable can only be true if dataset is public
-      if (isDatasetDownloadable && !isDatasetPublic) {
-        throw new BadRequestException("Dataset can only be downloadable if it is public")
-      }
-
       // Check if a dataset with the same name already exists
       if (!datasetDao.fetchByName(datasetName).isEmpty) {
         throw new BadRequestException("Dataset with the same name already exists")
@@ -583,7 +578,7 @@ class DatasetResource {
       @Auth user: SessionUser
   ): Response = {
     val uid = user.getUid
-    generatePresignedResponseWithS3(encodedUrl, datasetName, commitHash, uid)
+    generatePresignedResponse(encodedUrl, datasetName, commitHash, uid)
   }
 
   @GET
@@ -603,7 +598,7 @@ class DatasetResource {
       @QueryParam("datasetName") datasetName: String,
       @QueryParam("commitHash") commitHash: String
   ): Response = {
-    generatePresignedResponseWithS3(encodedUrl, datasetName, commitHash, null)
+    generatePresignedResponse(encodedUrl, datasetName, commitHash, null)
   }
 
   @DELETE
@@ -792,11 +787,6 @@ class DatasetResource {
       val newPublicStatus = !existedDataset.getIsPublic
       existedDataset.setIsPublic(newPublicStatus)
 
-      // If dataset becomes private, it must not be downloadable
-      if (!newPublicStatus) {
-        existedDataset.setIsDownloadable(false)
-      }
-
       datasetDao.update(existedDataset)
       Response.ok().build()
     }
@@ -819,11 +809,6 @@ class DatasetResource {
 
       val existedDataset = getDatasetByID(ctx, did)
       val newDownloadableStatus = !existedDataset.getIsDownloadable
-
-      // Validate business rule: can only set downloadable to true if dataset is public
-      if (newDownloadableStatus && !existedDataset.getIsPublic) {
-        throw new BadRequestException("Dataset can only be downloadable if it is public")
-      }
 
       existedDataset.setIsDownloadable(newDownloadableStatus)
 
@@ -1067,8 +1052,8 @@ class DatasetResource {
 
       // Retrieve dataset and check download permission
       val dataset = getDatasetByID(ctx, did)
-      // Non-owners can only download public and downloadable datasets
-      if (!userOwnDataset(ctx, did, uid) && (!dataset.getIsPublic || !dataset.getIsDownloadable)) {
+      // Non-owners can download if dataset is downloadable and they have read access
+      if (!userOwnDataset(ctx, did, uid) && !dataset.getIsDownloadable) {
         throw new ForbiddenException("Dataset download is not allowed")
       }
 
@@ -1322,53 +1307,6 @@ class DatasetResource {
           resolvedDatasetName,
           resolvedCommitHash,
           resolvedFilePath
-        )
-
-        Response.ok(Map("presignedUrl" -> url)).build()
-    }
-  }
-
-  private def generatePresignedResponseWithS3(
-      encodedUrl: String,
-      datasetName: String,
-      commitHash: String,
-      uid: Integer
-  ): Response = {
-    resolveDatasetAndPath(encodedUrl, datasetName, commitHash, uid) match {
-      case Left(errorResponse) =>
-        errorResponse
-
-      case Right((resolvedDatasetName, resolvedCommitHash, resolvedFilePath)) =>
-        // Additional download permission check for S3 downloads
-        if (uid != null) {
-          withTransaction(context) { ctx =>
-            val datasetDao = new DatasetDao(ctx.configuration())
-            val datasets = datasetDao.fetchByName(resolvedDatasetName).asScala.toList
-            if (datasets.nonEmpty) {
-              val dataset = datasets.head
-              // Non-owners can only download public and downloadable datasets
-              if (
-                !userOwnDataset(
-                  ctx,
-                  dataset.getDid,
-                  uid
-                ) && (!dataset.getIsPublic || !dataset.getIsDownloadable)
-              ) {
-                throw new ForbiddenException("Dataset download is not allowed")
-              }
-            }
-          }
-        }
-
-        val fileName = resolvedFilePath.split("/").lastOption.getOrElse("download")
-        val contentType = "application/octet-stream"
-        val url = S3StorageClient.getFilePresignedUrl(
-          resolvedDatasetName,
-          resolvedCommitHash,
-          resolvedFilePath,
-          fileName,
-          contentType,
-          EXPIRATION_MINUTES
         )
 
         Response.ok(Map("presignedUrl" -> url)).build()
