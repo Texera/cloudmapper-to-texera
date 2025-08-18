@@ -17,6 +17,9 @@
  * under the License.
  */
 
-package edu.uci.ics.amber.engine.common.ambermessage
+package edu.uci.ics.amber.operator.sklearn.training
 
-trait ControlPayload extends WorkflowFIFOMessagePayload
+class SklearnTrainingKNNOpDesc extends SklearnTrainingOpDesc {
+  override def getImportStatements = "from sklearn.neighbors import KNeighborsClassifier"
+  override def getUserFriendlyModelName = "Training: K-nearest Neighbors"
+}

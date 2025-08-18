@@ -18,8 +18,8 @@
  */
 
 import { Location } from "@angular/common";
-import { AfterViewInit, OnInit, Component, OnDestroy, ViewChild, ViewContainerRef, HostListener } from "@angular/core";
-import { ActivatedRoute, Router, Params } from "@angular/router";
+import { AfterViewInit, Component, HostListener, OnDestroy, OnInit, ViewChild, ViewContainerRef } from "@angular/core";
+import { ActivatedRoute, Router } from "@angular/router";
 import { UserService } from "../../common/service/user/user.service";
 import { WorkflowPersistService } from "../../common/service/workflow-persist/workflow-persist.service";
 import { Workflow } from "../../common/type/workflow";
@@ -37,11 +37,12 @@ import { WorkflowConsoleService } from "../service/workflow-console/workflow-con
 import { OperatorReuseCacheStatusService } from "../service/workflow-status/operator-reuse-cache-status.service";
 import { CodeEditorService } from "../service/code-editor/code-editor.service";
 import { WorkflowMetadata } from "src/app/dashboard/type/workflow-metadata.interface";
-import { HubService } from "../../hub/service/hub.service";
+import { EntityType, HubService } from "../../hub/service/hub.service";
 import { THROTTLE_TIME_MS } from "../../hub/component/workflow/detail/hub-workflow-detail.component";
 import { WorkflowCompilingService } from "../service/compile-workflow/workflow-compiling.service";
 import { DASHBOARD_USER_WORKSPACE } from "../../app-routing.constant";
 import { GuiConfigService } from "../../common/service/gui-config.service";
+import { checkIfWorkflowBroken } from "../../common/util/workflow-check";
 
 export const SAVE_DEBOUNCE_TIME_IN_MS = 5000;
 
@@ -205,6 +206,12 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
       .pipe(untilDestroyed(this))
       .subscribe(
         (workflow: Workflow) => {
+          if (checkIfWorkflowBroken(workflow)) {
+            this.notificationService.error(
+              "Sorry! The workflow is broken and cannot be persisted. Please contact the system admin."
+            );
+          }
+
           this.workflowActionService.setNewSharedModel(wid, this.userService.getCurrentUser());
           // remember URL fragment
           const fragment = this.route.snapshot.fragment;
@@ -325,7 +332,7 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
     let wid = this.route.snapshot.params.id;
     let uid = this.userService.getCurrentUser()?.uid;
     this.hubService
-      .postView(wid, uid ? uid : 0, "workflow")
+      .postView(wid, uid ? uid : 0, EntityType.Workflow)
       .pipe(throttleTime(THROTTLE_TIME_MS))
       .pipe(untilDestroyed(this))
       .subscribe();

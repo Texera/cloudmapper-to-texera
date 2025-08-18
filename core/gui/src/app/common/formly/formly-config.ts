@@ -28,6 +28,7 @@ import { InputAutoCompleteComponent } from "../../workspace/component/input-auto
 import { DirectoryPathInputComponent } from "../../workspace/component/directory-path-input/directory-path-input.component";
 import { CollabWrapperComponent } from "./collab-wrapper/collab-wrapper/collab-wrapper.component";
 import { ClusterAutoCompleteComponent } from "src/app/workspace/component/cluster-autocomplete/cluster-autocomplete.component";
+import { FormlyRepeatDndComponent } from "./repeat-dnd/repeat-dnd.component";
 
 /**
  * Configuration for using Json Schema with Formly.
@@ -80,6 +81,7 @@ export const TEXERA_FORMLY_CONFIG = {
     { name: "inputautocomplete", component: InputAutoCompleteComponent, wrappers: ["form-field"] },
     { name: "clusterautocomplete", component: ClusterAutoCompleteComponent, wrappers: ["form-field"] },
     { name: "directorypathinput", component: DirectoryPathInputComponent, wrappers: ["form-field"] },
+    { name: "repeat-section-dnd", component: FormlyRepeatDndComponent },
   ],
   wrappers: [
     { name: "preset-wrapper", component: PresetWrapperComponent },

@@ -41,6 +41,7 @@ DROP TABLE IF EXISTS workflow_user_access CASCADE;
 DROP TABLE IF EXISTS workflow_of_user CASCADE;
 DROP TABLE IF EXISTS user_config CASCADE;
 DROP TABLE IF EXISTS "user" CASCADE;
+DROP TABLE IF EXISTS time_log CASCADE;
 DROP TABLE IF EXISTS workflow CASCADE;
 DROP TABLE IF EXISTS workflow_version CASCADE;
 DROP TABLE IF EXISTS project CASCADE;
@@ -59,6 +60,7 @@ DROP TABLE IF EXISTS user_activity CASCADE;
 DROP TABLE IF EXISTS dataset_user_likes CASCADE;
 DROP TABLE IF EXISTS dataset_view_count CASCADE;
 DROP TABLE IF EXISTS site_settings CASCADE;
+DROP TABLE IF EXISTS computing_unit_user_access CASCADE;
 
 -- ============================================
 -- 4. Create PostgreSQL enum types
@@ -229,6 +231,7 @@ CREATE TABLE IF NOT EXISTS dataset
     owner_uid      INT NOT NULL,
     name           VARCHAR(128) NOT NULL,
     is_public      BOOLEAN NOT NULL DEFAULT TRUE,
+    is_downloadable BOOLEAN NOT NULL DEFAULT TRUE,
     description    VARCHAR(512) NOT NULL,
     creation_time  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_uid) REFERENCES "user"(uid) ON DELETE CASCADE
@@ -346,6 +349,25 @@ CREATE TABLE IF NOT EXISTS site_settings
     updated_by  VARCHAR(50),
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+CREATE TABLE IF NOT EXISTS time_log
+(
+    uid            INT          NOT NULL
+        PRIMARY KEY
+        REFERENCES "user"(uid),
+    last_login     TIMESTAMPTZ
+);
+
+-- computing_unit_user_access table
+CREATE TABLE IF NOT EXISTS computing_unit_user_access
+(
+    cuid      INT NOT NULL,
+    uid       INT NOT NULL,
+    privilege privilege_enum NOT NULL DEFAULT 'NONE',
+    PRIMARY KEY (cuid, uid),
+    FOREIGN KEY (cuid) REFERENCES workflow_computing_unit(cuid) ON DELETE CASCADE,
+    FOREIGN KEY (uid) REFERENCES "user"(uid) ON DELETE CASCADE
+);
 
 -- START Fulltext search index creation (DO NOT EDIT THIS LINE)
 CREATE EXTENSION IF NOT EXISTS pgroonga;

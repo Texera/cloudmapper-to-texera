@@ -17,4 +17,9 @@
  * under the License.
  */
 
-package edu.uci.ics.texera.workflow
+package edu.uci.ics.amber.operator.sklearn.training
+
+class SklearnTrainingRidgeCVOpDesc extends SklearnTrainingOpDesc {
+  override def getImportStatements = "from sklearn.linear_model import RidgeClassifierCV"
+  override def getUserFriendlyModelName = "Training: Ridge Regression Cross Validation"
+}

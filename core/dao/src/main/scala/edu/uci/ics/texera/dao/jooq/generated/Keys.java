@@ -23,6 +23,7 @@ package edu.uci.ics.texera.dao.jooq.generated;
 
 import edu.uci.ics.texera.dao.jooq.generated.tables.Cluster;
 import edu.uci.ics.texera.dao.jooq.generated.tables.ClusterActivity;
+import edu.uci.ics.texera.dao.jooq.generated.tables.ComputingUnitUserAccess;
 import edu.uci.ics.texera.dao.jooq.generated.tables.Dataset;
 import edu.uci.ics.texera.dao.jooq.generated.tables.DatasetUserAccess;
 import edu.uci.ics.texera.dao.jooq.generated.tables.DatasetUserLikes;
@@ -33,6 +34,8 @@ import edu.uci.ics.texera.dao.jooq.generated.tables.OperatorPortExecutions;
 import edu.uci.ics.texera.dao.jooq.generated.tables.Project;
 import edu.uci.ics.texera.dao.jooq.generated.tables.ProjectUserAccess;
 import edu.uci.ics.texera.dao.jooq.generated.tables.PublicProject;
+import edu.uci.ics.texera.dao.jooq.generated.tables.SiteSettings;
+import edu.uci.ics.texera.dao.jooq.generated.tables.TimeLog;
 import edu.uci.ics.texera.dao.jooq.generated.tables.User;
 import edu.uci.ics.texera.dao.jooq.generated.tables.UserConfig;
 import edu.uci.ics.texera.dao.jooq.generated.tables.Workflow;
@@ -47,6 +50,7 @@ import edu.uci.ics.texera.dao.jooq.generated.tables.WorkflowVersion;
 import edu.uci.ics.texera.dao.jooq.generated.tables.WorkflowViewCount;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.ClusterActivityRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.ClusterRecord;
+import edu.uci.ics.texera.dao.jooq.generated.tables.records.ComputingUnitUserAccessRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.DatasetRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.DatasetUserAccessRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.DatasetUserLikesRecord;
@@ -57,6 +61,8 @@ import edu.uci.ics.texera.dao.jooq.generated.tables.records.OperatorPortExecutio
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.ProjectRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.ProjectUserAccessRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.PublicProjectRecord;
+import edu.uci.ics.texera.dao.jooq.generated.tables.records.SiteSettingsRecord;
+import edu.uci.ics.texera.dao.jooq.generated.tables.records.TimeLogRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.UserConfigRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.UserRecord;
 import edu.uci.ics.texera.dao.jooq.generated.tables.records.WorkflowComputingUnitRecord;
@@ -90,6 +96,7 @@ public class Keys {
 
     public static final UniqueKey<ClusterRecord> CLUSTER_PKEY = Internal.createUniqueKey(Cluster.CLUSTER, DSL.name("cluster_pkey"), new TableField[] { Cluster.CLUSTER.CID }, true);
     public static final UniqueKey<ClusterActivityRecord> CLUSTER_ACTIVITY_PKEY = Internal.createUniqueKey(ClusterActivity.CLUSTER_ACTIVITY, DSL.name("cluster_activity_pkey"), new TableField[] { ClusterActivity.CLUSTER_ACTIVITY.ID }, true);
+    public static final UniqueKey<ComputingUnitUserAccessRecord> COMPUTING_UNIT_USER_ACCESS_PKEY = Internal.createUniqueKey(ComputingUnitUserAccess.COMPUTING_UNIT_USER_ACCESS, DSL.name("computing_unit_user_access_pkey"), new TableField[] { ComputingUnitUserAccess.COMPUTING_UNIT_USER_ACCESS.CUID, ComputingUnitUserAccess.COMPUTING_UNIT_USER_ACCESS.UID }, true);
     public static final UniqueKey<DatasetRecord> DATASET_PKEY = Internal.createUniqueKey(Dataset.DATASET, DSL.name("dataset_pkey"), new TableField[] { Dataset.DATASET.DID }, true);
     public static final UniqueKey<DatasetUserAccessRecord> DATASET_USER_ACCESS_PKEY = Internal.createUniqueKey(DatasetUserAccess.DATASET_USER_ACCESS, DSL.name("dataset_user_access_pkey"), new TableField[] { DatasetUserAccess.DATASET_USER_ACCESS.DID, DatasetUserAccess.DATASET_USER_ACCESS.UID }, true);
     public static final UniqueKey<DatasetUserLikesRecord> DATASET_USER_LIKES_PKEY = Internal.createUniqueKey(DatasetUserLikes.DATASET_USER_LIKES, DSL.name("dataset_user_likes_pkey"), new TableField[] { DatasetUserLikes.DATASET_USER_LIKES.UID, DatasetUserLikes.DATASET_USER_LIKES.DID }, true);
@@ -101,6 +108,8 @@ public class Keys {
     public static final UniqueKey<ProjectRecord> PROJECT_PKEY = Internal.createUniqueKey(Project.PROJECT, DSL.name("project_pkey"), new TableField[] { Project.PROJECT.PID }, true);
     public static final UniqueKey<ProjectUserAccessRecord> PROJECT_USER_ACCESS_PKEY = Internal.createUniqueKey(ProjectUserAccess.PROJECT_USER_ACCESS, DSL.name("project_user_access_pkey"), new TableField[] { ProjectUserAccess.PROJECT_USER_ACCESS.UID, ProjectUserAccess.PROJECT_USER_ACCESS.PID }, true);
     public static final UniqueKey<PublicProjectRecord> PUBLIC_PROJECT_PKEY = Internal.createUniqueKey(PublicProject.PUBLIC_PROJECT, DSL.name("public_project_pkey"), new TableField[] { PublicProject.PUBLIC_PROJECT.PID }, true);
+    public static final UniqueKey<SiteSettingsRecord> SITE_SETTINGS_PKEY = Internal.createUniqueKey(SiteSettings.SITE_SETTINGS, DSL.name("site_settings_pkey"), new TableField[] { SiteSettings.SITE_SETTINGS.KEY }, true);
+    public static final UniqueKey<TimeLogRecord> TIME_LOG_PKEY = Internal.createUniqueKey(TimeLog.TIME_LOG, DSL.name("time_log_pkey"), new TableField[] { TimeLog.TIME_LOG.UID }, true);
     public static final UniqueKey<UserRecord> USER_EMAIL_KEY = Internal.createUniqueKey(User.USER, DSL.name("user_email_key"), new TableField[] { User.USER.EMAIL }, true);
     public static final UniqueKey<UserRecord> USER_GOOGLE_ID_KEY = Internal.createUniqueKey(User.USER, DSL.name("user_google_id_key"), new TableField[] { User.USER.GOOGLE_ID }, true);
     public static final UniqueKey<UserRecord> USER_PKEY = Internal.createUniqueKey(User.USER, DSL.name("user_pkey"), new TableField[] { User.USER.UID }, true);
@@ -122,6 +131,8 @@ public class Keys {
 
     public static final ForeignKey<ClusterRecord, UserRecord> CLUSTER__CLUSTER_OWNER_ID_FKEY = Internal.createForeignKey(Cluster.CLUSTER, DSL.name("cluster_owner_id_fkey"), new TableField[] { Cluster.CLUSTER.OWNER_ID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
     public static final ForeignKey<ClusterActivityRecord, ClusterRecord> CLUSTER_ACTIVITY__CLUSTER_ACTIVITY_CLUSTER_ID_FKEY = Internal.createForeignKey(ClusterActivity.CLUSTER_ACTIVITY, DSL.name("cluster_activity_cluster_id_fkey"), new TableField[] { ClusterActivity.CLUSTER_ACTIVITY.CLUSTER_ID }, Keys.CLUSTER_PKEY, new TableField[] { Cluster.CLUSTER.CID }, true);
+    public static final ForeignKey<ComputingUnitUserAccessRecord, WorkflowComputingUnitRecord> COMPUTING_UNIT_USER_ACCESS__COMPUTING_UNIT_USER_ACCESS_CUID_FKEY = Internal.createForeignKey(ComputingUnitUserAccess.COMPUTING_UNIT_USER_ACCESS, DSL.name("computing_unit_user_access_cuid_fkey"), new TableField[] { ComputingUnitUserAccess.COMPUTING_UNIT_USER_ACCESS.CUID }, Keys.WORKFLOW_COMPUTING_UNIT_PKEY, new TableField[] { WorkflowComputingUnit.WORKFLOW_COMPUTING_UNIT.CUID }, true);
+    public static final ForeignKey<ComputingUnitUserAccessRecord, UserRecord> COMPUTING_UNIT_USER_ACCESS__COMPUTING_UNIT_USER_ACCESS_UID_FKEY = Internal.createForeignKey(ComputingUnitUserAccess.COMPUTING_UNIT_USER_ACCESS, DSL.name("computing_unit_user_access_uid_fkey"), new TableField[] { ComputingUnitUserAccess.COMPUTING_UNIT_USER_ACCESS.UID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
     public static final ForeignKey<DatasetRecord, UserRecord> DATASET__DATASET_OWNER_UID_FKEY = Internal.createForeignKey(Dataset.DATASET, DSL.name("dataset_owner_uid_fkey"), new TableField[] { Dataset.DATASET.OWNER_UID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
     public static final ForeignKey<DatasetUserAccessRecord, DatasetRecord> DATASET_USER_ACCESS__DATASET_USER_ACCESS_DID_FKEY = Internal.createForeignKey(DatasetUserAccess.DATASET_USER_ACCESS, DSL.name("dataset_user_access_did_fkey"), new TableField[] { DatasetUserAccess.DATASET_USER_ACCESS.DID }, Keys.DATASET_PKEY, new TableField[] { Dataset.DATASET.DID }, true);
     public static final ForeignKey<DatasetUserAccessRecord, UserRecord> DATASET_USER_ACCESS__DATASET_USER_ACCESS_UID_FKEY = Internal.createForeignKey(DatasetUserAccess.DATASET_USER_ACCESS, DSL.name("dataset_user_access_uid_fkey"), new TableField[] { DatasetUserAccess.DATASET_USER_ACCESS.UID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
@@ -135,6 +146,7 @@ public class Keys {
     public static final ForeignKey<ProjectUserAccessRecord, ProjectRecord> PROJECT_USER_ACCESS__PROJECT_USER_ACCESS_PID_FKEY = Internal.createForeignKey(ProjectUserAccess.PROJECT_USER_ACCESS, DSL.name("project_user_access_pid_fkey"), new TableField[] { ProjectUserAccess.PROJECT_USER_ACCESS.PID }, Keys.PROJECT_PKEY, new TableField[] { Project.PROJECT.PID }, true);
     public static final ForeignKey<ProjectUserAccessRecord, UserRecord> PROJECT_USER_ACCESS__PROJECT_USER_ACCESS_UID_FKEY = Internal.createForeignKey(ProjectUserAccess.PROJECT_USER_ACCESS, DSL.name("project_user_access_uid_fkey"), new TableField[] { ProjectUserAccess.PROJECT_USER_ACCESS.UID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
     public static final ForeignKey<PublicProjectRecord, ProjectRecord> PUBLIC_PROJECT__PUBLIC_PROJECT_PID_FKEY = Internal.createForeignKey(PublicProject.PUBLIC_PROJECT, DSL.name("public_project_pid_fkey"), new TableField[] { PublicProject.PUBLIC_PROJECT.PID }, Keys.PROJECT_PKEY, new TableField[] { Project.PROJECT.PID }, true);
+    public static final ForeignKey<TimeLogRecord, UserRecord> TIME_LOG__TIME_LOG_UID_FKEY = Internal.createForeignKey(TimeLog.TIME_LOG, DSL.name("time_log_uid_fkey"), new TableField[] { TimeLog.TIME_LOG.UID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
     public static final ForeignKey<UserConfigRecord, UserRecord> USER_CONFIG__USER_CONFIG_UID_FKEY = Internal.createForeignKey(UserConfig.USER_CONFIG, DSL.name("user_config_uid_fkey"), new TableField[] { UserConfig.USER_CONFIG.UID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
     public static final ForeignKey<WorkflowComputingUnitRecord, UserRecord> WORKFLOW_COMPUTING_UNIT__WORKFLOW_COMPUTING_UNIT_UID_FKEY = Internal.createForeignKey(WorkflowComputingUnit.WORKFLOW_COMPUTING_UNIT, DSL.name("workflow_computing_unit_uid_fkey"), new TableField[] { WorkflowComputingUnit.WORKFLOW_COMPUTING_UNIT.UID }, Keys.USER_PKEY, new TableField[] { User.USER.UID }, true);
     public static final ForeignKey<WorkflowExecutionsRecord, WorkflowComputingUnitRecord> WORKFLOW_EXECUTIONS__WORKFLOW_EXECUTIONS_CUID_FKEY = Internal.createForeignKey(WorkflowExecutions.WORKFLOW_EXECUTIONS, DSL.name("workflow_executions_cuid_fkey"), new TableField[] { WorkflowExecutions.WORKFLOW_EXECUTIONS.CUID }, Keys.WORKFLOW_COMPUTING_UNIT_PKEY, new TableField[] { WorkflowComputingUnit.WORKFLOW_COMPUTING_UNIT.CUID }, true);
