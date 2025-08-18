@@ -187,6 +187,11 @@ workflowComputingUnitPool:
   name: texera-workflow-computing-unit
   # Note: the namespace of the workflow computing unit pool might conflict when there are multiple texera deployments in the same cluster
   namespace: texera-workflow-computing-unit-pool
+  # Max number of resources allocated for computing units
+  maxRequestedResources:
+    cpu: 100
+    memory: 100Gi
+    nvidiaGpu: 5
   imageName: texera/computing-unit-master:cluster
   service:
     port: 8085
@@ -235,6 +240,8 @@ texeraEnvVars:
     value: "true"
   - name: GUI_WORKFLOW_WORKSPACE_ASYNC_RENDERING_ENABLED
     value: "true"
+  - name: COMPUTING_UNIT_SHARING_ENABLED
+    value: "true"
   - name: USER_SYS_INVITE_ONLY
     value: "true"
   - name: USER_SYS_GOOGLE_CLIENT_ID
@@ -242,6 +249,8 @@ texeraEnvVars:
   - name: USER_SYS_GOOGLE_SMTP_GMAIL
     value: ""
   - name: USER_SYS_GOOGLE_SMTP_PASSWORD
+    value: ""
+  - name: USER_SYS_DOMAIN
     value: ""
 
 # Ingress dependency configs
@@ -303,6 +312,7 @@ metrics-server:
 # Custom Ingress resource configs
 ingressPaths:
   enabled: true
+  ingressClassName: nginx  # Set to "alb" when deploying on AWS
   hostname: ""
   # Optional TLS secret (manually created)
   tlsSecretName: ""  # e.g., "texera-tls"
@@ -321,6 +331,9 @@ ingressPaths:
     - path: /api/access/dataset
       serviceName: file-service-svc
       servicePort: 9092
+    - path: /api/access/computing-unit
+      serviceName: workflow-computing-unit-manager-svc
+      servicePort: 8888
     - path: /api/config
       serviceName: config-service-svc
       servicePort: 9094

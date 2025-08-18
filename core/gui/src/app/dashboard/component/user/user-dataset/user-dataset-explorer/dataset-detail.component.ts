@@ -18,14 +18,13 @@
  */
 
 import { Component, EventEmitter, OnInit, Output } from "@angular/core";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { DatasetService, MultipartUploadProgress } from "../../../../service/user/dataset/dataset.service";
 import { NzResizeEvent } from "ng-zorro-antd/resizable";
 import {
   DatasetFileNode,
   getFullPathFromDatasetFileNode,
-  getPathsUnderOrEqualDatasetFileNode,
   getRelativePathFromDatasetFileNode,
 } from "../../../../../common/type/datasetVersionFileTree";
 import { DatasetVersion } from "../../../../../common/type/dataset";
@@ -33,16 +32,16 @@ import { switchMap, throttleTime } from "rxjs/operators";
 import { NotificationService } from "../../../../../common/service/notification/notification.service";
 import { DownloadService } from "../../../../service/user/download/download.service";
 import { formatSize } from "src/app/common/util/size-formatter.util";
-import { DASHBOARD_USER_DATASET } from "../../../../../app-routing.constant";
 import { UserService } from "../../../../../common/service/user/user.service";
 import { isDefined } from "../../../../../common/util/predicate";
-import { HubService } from "../../../../../hub/service/hub.service";
+import { ActionType, EntityType, HubService, LikedStatus } from "../../../../../hub/service/hub.service";
 import { FileUploadItem } from "../../../../type/dashboard-file.interface";
-import { file } from "jszip";
 import { DatasetStagedObject } from "../../../../../common/type/dataset-staged-object";
 import { NzModalService } from "ng-zorro-antd/modal";
 import { UserDatasetVersionCreatorComponent } from "./user-dataset-version-creator/user-dataset-version-creator.component";
-import { DashboardDataset } from "../../../../type/dashboard-dataset.interface";
+import { AdminSettingsService } from "../../../../service/admin/settings/admin-settings.service";
+import { HttpErrorResponse } from "@angular/common/http";
+import { Subscription } from "rxjs";
 
 export const THROTTLE_TIME_MS = 1000;
 
@@ -57,7 +56,9 @@ export class DatasetDetailComponent implements OnInit {
   public datasetDescription: string = "";
   public datasetCreationTime: string = "";
   public datasetIsPublic: boolean = false;
+  public datasetIsDownloadable: boolean = true;
   public userDatasetAccessLevel: "READ" | "WRITE" | "NONE" = "NONE";
+  public isOwner: boolean = false;
 
   public currentDisplayedFileName: string = "";
   public currentFileSize: number | undefined;
@@ -80,6 +81,13 @@ export class DatasetDetailComponent implements OnInit {
   public displayPreciseViewCount = false;
 
   userHasPendingChanges: boolean = false;
+  // Uploading setting
+  chunkSizeMB: number = 50;
+  maxConcurrentChunks: number = 10;
+  private uploadSubscriptions = new Map<string, Subscription>();
+
+  versionName: string = "";
+  isCreatingVersion: boolean = false;
 
   //  List of upload tasks – each task tracked by its filePath
   public uploadTasks: Array<
@@ -98,7 +106,8 @@ export class DatasetDetailComponent implements OnInit {
     private notificationService: NotificationService,
     private downloadService: DownloadService,
     private userService: UserService,
-    private hubService: HubService
+    private hubService: HubService,
+    private adminSettingsService: AdminSettingsService
   ) {
     this.userService
       .userChanged()
@@ -139,14 +148,14 @@ export class DatasetDetailComponent implements OnInit {
     }
 
     this.hubService
-      .getLikeCount(this.did, "dataset")
+      .getCounts([EntityType.Dataset], [this.did], [ActionType.Like])
       .pipe(untilDestroyed(this))
-      .subscribe(count => {
-        this.likeCount = count;
+      .subscribe(counts => {
+        this.likeCount = counts[0].counts.like ?? 0;
       });
 
     this.hubService
-      .postView(this.did, this.currentUid ? this.currentUid : 0, "dataset")
+      .postView(this.did, this.currentUid ? this.currentUid : 0, EntityType.Dataset)
       .pipe(throttleTime(THROTTLE_TIME_MS))
       .pipe(untilDestroyed(this))
       .subscribe(count => {
@@ -158,39 +167,36 @@ export class DatasetDetailComponent implements OnInit {
     }
 
     this.hubService
-      .isLiked(this.did, this.currentUid, "dataset")
+      .isLiked([this.did], [EntityType.Dataset])
       .pipe(untilDestroyed(this))
-      .subscribe((isLiked: boolean) => {
-        this.isLiked = isLiked;
+      .subscribe((isLiked: LikedStatus[]) => {
+        this.isLiked = isLiked.length > 0 ? isLiked[0].isLiked : false;
       });
+
+    this.loadUploadSettings();
   }
 
   public onClickOpenVersionCreator() {
-    if (this.did) {
-      const modal = this.modalService.create({
-        nzTitle: "Create New Dataset Version",
-        nzContent: UserDatasetVersionCreatorComponent,
-        nzFooter: null,
-        nzData: {
-          isCreatingVersion: true,
-          did: this.did,
-        },
-        nzBodyStyle: {
-          resize: "both",
-          overflow: "auto",
-          minHeight: "200px",
-          minWidth: "550px",
-          maxWidth: "90vw",
-          maxHeight: "80vh",
-        },
-        nzWidth: "fit-content",
-      });
-      modal.afterClose.pipe(untilDestroyed(this)).subscribe(result => {
-        if (result != null) {
-          this.retrieveDatasetVersionList();
-          this.userMakeChanges.emit();
-        }
-      });
+    if (this.did && !this.isCreatingVersion) {
+      this.isCreatingVersion = true;
+
+      this.datasetService
+        .createDatasetVersion(this.did, this.versionName?.trim() || "")
+        .pipe(untilDestroyed(this))
+        .subscribe({
+          next: res => {
+            this.notificationService.success("Version Created");
+            this.isCreatingVersion = false;
+            this.versionName = "";
+            this.retrieveDatasetVersionList();
+            this.userMakeChanges.emit();
+          },
+          error: (res: unknown) => {
+            const err = res as HttpErrorResponse;
+            this.notificationService.error(`Version creation failed: ${err.error.message}`);
+            this.isCreatingVersion = false;
+          },
+        });
     }
   }
 
@@ -212,6 +218,10 @@ export class DatasetDetailComponent implements OnInit {
         .subscribe({
           next: (res: Response) => {
             this.datasetIsPublic = checked;
+            // If dataset becomes private, it cannot be downloadable
+            if (!checked) {
+              this.datasetIsDownloadable = false;
+            }
             let state = "public";
             if (!this.datasetIsPublic) {
               state = "private";
@@ -220,6 +230,34 @@ export class DatasetDetailComponent implements OnInit {
           },
           error: (err: unknown) => {
             this.notificationService.error("Fail to change the dataset publicity");
+          },
+        });
+    }
+  }
+
+  onDownloadableStatusChange(checked: boolean): void {
+    // Only allow downloadable change if dataset is public
+    if (checked && !this.datasetIsPublic) {
+      this.notificationService.error("Dataset can only be downloadable if it is public");
+      return;
+    }
+
+    // Handle the change in dataset downloadable status
+    if (this.did) {
+      this.datasetService
+        .updateDatasetDownloadable(this.did)
+        .pipe(untilDestroyed(this))
+        .subscribe({
+          next: (res: Response) => {
+            this.datasetIsDownloadable = checked;
+            let state = "allowed";
+            if (!this.datasetIsDownloadable) {
+              state = "not allowed";
+            }
+            this.notificationService.success(`Dataset downloads are now ${state}`);
+          },
+          error: (err: unknown) => {
+            this.notificationService.error("Failed to change the dataset download permission");
           },
         });
     }
@@ -236,6 +274,8 @@ export class DatasetDetailComponent implements OnInit {
           this.datasetDescription = dataset.description;
           this.userDatasetAccessLevel = dashboardDataset.accessPrivilege;
           this.datasetIsPublic = dataset.isPublic;
+          this.datasetIsDownloadable = dataset.isDownloadable;
+          this.isOwner = dashboardDataset.isOwner;
           if (typeof dataset.creationTime === "number") {
             this.datasetCreationTime = new Date(dataset.creationTime).toString();
           }
@@ -267,8 +307,7 @@ export class DatasetDetailComponent implements OnInit {
 
   onClickDownloadCurrentFile = (): void => {
     if (!this.did || !this.selectedVersion?.dvid) return;
-
-    this.downloadService.downloadSingleFile(this.currentDisplayedFileName).pipe(untilDestroyed(this)).subscribe();
+    this.downloadService.downloadSingleFile(this.currentDisplayedFileName);
   };
 
   onClickScaleTheView() {
@@ -308,15 +347,40 @@ export class DatasetDetailComponent implements OnInit {
     return this.userDatasetAccessLevel == "WRITE";
   }
 
+  isDownloadAllowed(): boolean {
+    // Owners can always download
+    if (this.isOwner) {
+      return true;
+    }
+    // Non-owners can only download if dataset is public and downloadable
+    return this.datasetIsPublic && this.datasetIsDownloadable;
+  }
+
   // Track multiple file by unique key
   trackByTask(_: number, task: MultipartUploadProgress & { filePath: string }): string {
     return task.filePath;
   }
 
+  private loadUploadSettings(): void {
+    this.adminSettingsService
+      .getSetting("multipart_upload_chunk_size_mb")
+      .pipe(untilDestroyed(this))
+      .subscribe(value => (this.chunkSizeMB = parseInt(value)));
+    this.adminSettingsService
+      .getSetting("max_number_of_concurrent_uploading_file_chunks")
+      .pipe(untilDestroyed(this))
+      .subscribe(value => (this.maxConcurrentChunks = parseInt(value)));
+  }
+
   onNewUploadFilesChanged(files: FileUploadItem[]) {
     if (this.did) {
       files.forEach((file, idx) => {
-        // Add an initializing task placeholder to uploadTasks.
+        // Cancel any existing upload for the same file to prevent progress confusion
+        this.uploadSubscriptions.get(file.name)?.unsubscribe();
+        this.uploadSubscriptions.delete(file.name);
+        this.uploadTasks = this.uploadTasks.filter(t => t.filePath !== file.name);
+
+        // Add an initializing task placeholder to uploadTasks
         this.uploadTasks.push({
           filePath: file.name,
           percentage: 0,
@@ -324,10 +388,15 @@ export class DatasetDetailComponent implements OnInit {
           uploadId: "",
           physicalAddress: "",
         });
-
         // Start multipart upload
-        this.datasetService
-          .multipartUpload(this.datasetName, file.name, file.file)
+        const subscription = this.datasetService
+          .multipartUpload(
+            this.datasetName,
+            file.name,
+            file.file,
+            this.chunkSizeMB * 1024 * 1024,
+            this.maxConcurrentChunks
+          )
           .pipe(untilDestroyed(this))
           .subscribe({
             next: progress => {
@@ -371,16 +440,19 @@ export class DatasetDetailComponent implements OnInit {
               }
             },
           });
+        // Store the subscription for later cleanup
+        this.uploadSubscriptions.set(file.name, subscription);
       });
     }
   }
 
-  // Hide a task row after 3s (stores timer to clear on destroy)
+  // Hide a task row after 3s (stores timer to clear on destroy) and clean up its subscription
   private scheduleHide(idx: number) {
     if (idx === -1) {
       return;
     }
     const key = this.uploadTasks[idx].filePath;
+    this.uploadSubscriptions.delete(key);
     const handle = window.setTimeout(() => {
       this.uploadTasks = this.uploadTasks.filter(t => t.filePath !== key);
     }, 3000);
@@ -388,6 +460,11 @@ export class DatasetDetailComponent implements OnInit {
   }
 
   onClickAbortUploadProgress(task: MultipartUploadProgress & { filePath: string }) {
+    const subscription = this.uploadSubscriptions.get(task.filePath);
+    if (subscription) {
+      subscription.unsubscribe();
+      this.uploadSubscriptions.delete(task.filePath);
+    }
     this.datasetService
       .finalizeMultipartUpload(
         this.datasetName,
@@ -450,31 +527,31 @@ export class DatasetDetailComponent implements OnInit {
 
     if (this.isLiked) {
       this.hubService
-        .postUnlike(this.did, userId, "dataset")
+        .postUnlike(this.did, EntityType.Dataset)
         .pipe(untilDestroyed(this))
         .subscribe((success: boolean) => {
           if (success) {
             this.isLiked = false;
             this.hubService
-              .getLikeCount(this.did!, "dataset")
+              .getCounts([EntityType.Dataset], [this.did!], [ActionType.Like])
               .pipe(untilDestroyed(this))
-              .subscribe((count: number) => {
-                this.likeCount = count;
+              .subscribe(counts => {
+                this.likeCount = counts[0].counts.like ?? 0;
               });
           }
         });
     } else {
       this.hubService
-        .postLike(this.did, userId, "dataset")
+        .postLike(this.did, EntityType.Dataset)
         .pipe(untilDestroyed(this))
         .subscribe((success: boolean) => {
           if (success) {
             this.isLiked = true;
             this.hubService
-              .getLikeCount(this.did!, "dataset")
+              .getCounts([EntityType.Dataset], [this.did!], [ActionType.Like])
               .pipe(untilDestroyed(this))
-              .subscribe((count: number) => {
-                this.likeCount = count;
+              .subscribe(counts => {
+                this.likeCount = counts[0].counts.like ?? 0;
               });
           }
         });

@@ -19,7 +19,7 @@
 
 package edu.uci.ics.texera.service.resource
 
-import edu.uci.ics.texera.config.{GuiConfig, UserSystemConfig}
+import edu.uci.ics.texera.config.{ComputingUnitConfig, GuiConfig, UserSystemConfig}
 import jakarta.annotation.security.RolesAllowed
 import jakarta.ws.rs.{GET, Path, Produces}
 import jakarta.ws.rs.core.MediaType
@@ -45,14 +45,9 @@ class ConfigResource {
       "asyncRenderingEnabled" -> GuiConfig.guiWorkflowWorkspaceAsyncRenderingEnabled,
       "timetravelEnabled" -> GuiConfig.guiWorkflowWorkspaceTimetravelEnabled,
       "productionSharedEditingServer" -> GuiConfig.guiWorkflowWorkspaceProductionSharedEditingServer,
-      "singleFileUploadMaximumSizeMB" -> GuiConfig.guiDatasetSingleFileUploadMaximumSizeMB,
-      "maxNumberOfConcurrentUploadingFileChunks" -> GuiConfig.guiDatasetMaxNumberOfConcurrentUploadingFileChunks,
-      "multipartUploadChunkSizeByte" -> GuiConfig.guiDatasetMultipartUploadChunkSizeByte,
       "defaultDataTransferBatchSize" -> GuiConfig.guiWorkflowWorkspaceDefaultDataTransferBatchSize,
       "workflowEmailNotificationEnabled" -> GuiConfig.guiWorkflowWorkspaceWorkflowEmailNotificationEnabled,
-      "hubEnabled" -> GuiConfig.guiDashboardHubEnabled,
-      "forumEnabled" -> GuiConfig.guiDashboardForumEnabled,
-      "projectEnabled" -> GuiConfig.guiDashboardProjectEnabled,
+      "sharingComputingUnitEnabled" -> ComputingUnitConfig.sharingComputingUnitEnabled,
       "operatorConsoleMessageBufferSize" -> GuiConfig.guiWorkflowWorkspaceOperatorConsoleMessageBufferSize,
       "pythonLanguageServerPort" -> GuiConfig.guiWorkflowWorkspacePythonLanguageServerPort,
       "defaultLocalUser" -> Map(

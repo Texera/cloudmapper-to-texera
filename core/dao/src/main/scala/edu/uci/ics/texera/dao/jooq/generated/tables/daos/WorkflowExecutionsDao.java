@@ -117,6 +117,21 @@ public class WorkflowExecutionsDao extends DAOImpl<WorkflowExecutionsRecord, edu
     }
 
     /**
+     * Fetch records that have <code>cuid BETWEEN lowerInclusive AND
+     * upperInclusive</code>
+     */
+    public List<edu.uci.ics.texera.dao.jooq.generated.tables.pojos.WorkflowExecutions> fetchRangeOfCuid(Integer lowerInclusive, Integer upperInclusive) {
+        return fetchRange(WorkflowExecutions.WORKFLOW_EXECUTIONS.CUID, lowerInclusive, upperInclusive);
+    }
+
+    /**
+     * Fetch records that have <code>cuid IN (values)</code>
+     */
+    public List<edu.uci.ics.texera.dao.jooq.generated.tables.pojos.WorkflowExecutions> fetchByCuid(Integer... values) {
+        return fetch(WorkflowExecutions.WORKFLOW_EXECUTIONS.CUID, values);
+    }
+
+    /**
      * Fetch records that have <code>status BETWEEN lowerInclusive AND
      * upperInclusive</code>
      */
@@ -249,21 +264,6 @@ public class WorkflowExecutionsDao extends DAOImpl<WorkflowExecutionsRecord, edu
      */
     public List<edu.uci.ics.texera.dao.jooq.generated.tables.pojos.WorkflowExecutions> fetchByRuntimeStatsUri(String... values) {
         return fetch(WorkflowExecutions.WORKFLOW_EXECUTIONS.RUNTIME_STATS_URI, values);
-    }
-
-    /**
-     * Fetch records that have <code>cuid BETWEEN lowerInclusive AND
-     * upperInclusive</code>
-     */
-    public List<edu.uci.ics.texera.dao.jooq.generated.tables.pojos.WorkflowExecutions> fetchRangeOfCuid(Integer lowerInclusive, Integer upperInclusive) {
-        return fetchRange(WorkflowExecutions.WORKFLOW_EXECUTIONS.CUID, lowerInclusive, upperInclusive);
-    }
-
-    /**
-     * Fetch records that have <code>cuid IN (values)</code>
-     */
-    public List<edu.uci.ics.texera.dao.jooq.generated.tables.pojos.WorkflowExecutions> fetchByCuid(Integer... values) {
-        return fetch(WorkflowExecutions.WORKFLOW_EXECUTIONS.CUID, values);
     }
 
     /**

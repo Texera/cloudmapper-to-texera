@@ -21,7 +21,8 @@ import { DashboardFile } from "./dashboard-file.interface";
 import { DashboardWorkflow } from "./dashboard-workflow.interface";
 import { DashboardProject } from "./dashboard-project.interface";
 import { DashboardDataset } from "./dashboard-dataset.interface";
-import { isDashboardWorkflow, isDashboardProject, isDashboardFile, isDashboardDataset } from "./type-predicates";
+import { isDashboardDataset, isDashboardFile, isDashboardProject, isDashboardWorkflow } from "./type-predicates";
+import { EntityType } from "../../hub/service/hub.service";
 
 export interface UserInfo {
   userName: string;
@@ -30,7 +31,7 @@ export interface UserInfo {
 
 export class DashboardEntry {
   checked = false;
-  type: "workflow" | "project" | "file" | "dataset";
+  type: EntityType;
   name: string;
   creationTime: number | undefined;
   lastModifiedTime: number | undefined;
@@ -42,10 +43,15 @@ export class DashboardEntry {
   ownerGoogleAvatar: string | undefined;
   ownerId: number | undefined;
   size: number | undefined;
+  viewCount: number;
+  cloneCount: number;
+  likeCount: number;
+  isLiked: boolean;
+  accessibleUserIds: number[];
 
   constructor(public value: DashboardWorkflow | DashboardProject | DashboardFile | DashboardDataset) {
     if (isDashboardWorkflow(value)) {
-      this.type = "workflow";
+      this.type = EntityType.Workflow;
       this.id = value.workflow.wid;
       this.name = value.workflow.name;
       this.description = value.workflow.description;
@@ -57,8 +63,13 @@ export class DashboardEntry {
       this.ownerGoogleAvatar = "";
       this.ownerId = value.ownerId;
       this.size = 0;
+      this.viewCount = 0;
+      this.cloneCount = 0;
+      this.likeCount = 0;
+      this.isLiked = false;
+      this.accessibleUserIds = [];
     } else if (isDashboardProject(value)) {
-      this.type = "project";
+      this.type = EntityType.Project;
       this.id = value.pid;
       this.name = value.name;
       this.description = "";
@@ -70,8 +81,13 @@ export class DashboardEntry {
       this.ownerGoogleAvatar = "";
       this.ownerId = value.ownerId;
       this.size = 0;
+      this.viewCount = 0;
+      this.cloneCount = 0;
+      this.likeCount = 0;
+      this.isLiked = false;
+      this.accessibleUserIds = [];
     } else if (isDashboardFile(value)) {
-      this.type = "file";
+      this.type = EntityType.File;
       this.id = value.file.fid;
       this.name = value.file.name;
       this.description = value.file.description;
@@ -83,8 +99,13 @@ export class DashboardEntry {
       this.ownerGoogleAvatar = "";
       this.ownerId = value.file.ownerUid;
       this.size = value.file.size;
+      this.viewCount = 0;
+      this.cloneCount = 0;
+      this.likeCount = 0;
+      this.isLiked = false;
+      this.accessibleUserIds = [];
     } else if (isDashboardDataset(value)) {
-      this.type = "dataset";
+      this.type = EntityType.Dataset;
       this.id = value.dataset.did;
       this.name = value.dataset.name;
       this.description = value.dataset.description;
@@ -96,6 +117,11 @@ export class DashboardEntry {
       this.ownerGoogleAvatar = "";
       this.ownerId = value.dataset.ownerUid;
       this.size = value.size;
+      this.viewCount = 0;
+      this.cloneCount = 0;
+      this.likeCount = 0;
+      this.isLiked = false;
+      this.accessibleUserIds = [];
     } else {
       throw new Error("Unexpected type in DashboardEntry.");
     }
@@ -107,6 +133,24 @@ export class DashboardEntry {
 
   setOwnerGoogleAvatar(ownerGoogleAvatar: string): void {
     this.ownerGoogleAvatar = ownerGoogleAvatar;
+  }
+
+  setCount(viewCount: number, cloneCount: number, likeCount: number): void {
+    this.viewCount = viewCount;
+    this.cloneCount = cloneCount;
+    this.likeCount = likeCount;
+  }
+
+  setIsLiked(isLiked: boolean): void {
+    this.isLiked = isLiked;
+  }
+
+  setAccessUsers(accessUsers: number[]): void {
+    this.accessibleUserIds = accessUsers;
+  }
+
+  setSize(size: number): void {
+    this.size = size;
   }
 
   get project(): DashboardProject {
