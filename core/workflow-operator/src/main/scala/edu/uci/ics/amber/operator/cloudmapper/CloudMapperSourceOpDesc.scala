@@ -126,6 +126,7 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |            if gtf_file:
        |                files['gtfFile'] = gtf_file
        |
+       |
        |        # Example job_form dictionary using inputs from Scala
        |        job_form = {
        |            'referenceGenome': ${pythonAllReferenceGenomes},
