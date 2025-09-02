@@ -129,10 +129,10 @@ export class ClusterComponent implements OnInit, OnDestroy {
         return ["loading", "gold"];
       case "STOPPING":
       case "STOP_RECEIVED":
-        return ["pause-circle", "orange"];
+        return ["loading", "orange"];
       case "SHUTTING_DOWN":
       case "TERMINATE_RECEIVED":
-        return ["delete", "red"];
+        return ["loading", "red"];
       case "RUNNING":
         return ["check-circle", "green"];
       case "STOPPED":
