@@ -350,6 +350,9 @@ ingressPaths:
     - path: /wsapi/workflow-websocket
       serviceName: envoy-svc
       servicePort: 10000
+    - path: /wsapi/cu-ssh
+      serviceName: envoy-svc
+      servicePort: 10000
     - path: /api/executions/*/stats/*
       pathType: ImplementationSpecific
       serviceName: envoy-svc
