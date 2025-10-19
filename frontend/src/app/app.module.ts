@@ -185,6 +185,7 @@ import { NzCheckboxModule } from "ng-zorro-antd/checkbox";
 import { NzRadioModule } from "ng-zorro-antd/radio";
 import { RegistrationRequestModalComponent } from "./common/service/user/registration-request-modal/registration-request-modal.component";
 import { MarkdownDescriptionComponent } from "./dashboard/component/user/markdown-description/markdown-description.component";
+import { PermissionEditModalComponent } from "./dashboard/component/admin/user/permission-edit-modal/permission-edit-modal.component";
 
 registerLocaleData(en);
 
@@ -283,6 +284,7 @@ registerLocaleData(en);
     AdminSettingsComponent,
     RegistrationRequestModalComponent,
     MarkdownDescriptionComponent,
+    PermissionEditModalComponent,
   ],
   imports: [
     BrowserModule,

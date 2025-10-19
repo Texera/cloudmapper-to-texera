@@ -47,15 +47,40 @@ case class UserInfo(
     lastLogin: java.time.OffsetDateTime, // will be null if never logged in
     accountCreation: java.time.OffsetDateTime,
     affiliation: String,
-    joiningReason: String
+    joiningReason: String,
+    permission: String // JSON string representing user permissions
+)
+
+// Permission field schema definition
+case class PermissionFieldSchema(
+    fieldType: String, // "boolean", "number", or "string"
+    possibleValues: List[Any], // List of possible values, empty list if not a category field
+    defaultValue: Any, // Default value for this permission
+    description: String // Human-readable description of what this permission does
+)
+
+// Permission template containing all available permissions
+case class PermissionTemplate(
+    permissions: Map[String, PermissionFieldSchema]
 )
 
 object AdminUserResource {
-  private def context =
-    SqlServer
-      .getInstance()
-      .createDSLContext()
-  private def userDao = new UserDao(context.configuration)
+  final private lazy val context = SqlServer
+    .getInstance()
+    .createDSLContext()
+  final private lazy val userDao = new UserDao(context.configuration)
+
+  // Define the permission template with all available permissions
+  val permissionTemplate: PermissionTemplate = PermissionTemplate(
+    permissions = Map(
+      "sshToComputingUnit" -> PermissionFieldSchema(
+        fieldType = "boolean",
+        possibleValues = List(true, false),
+        defaultValue = false,
+        description = "Allow user to access SSH terminal for computing units they have access to"
+      )
+    )
+  )
 }
 
 @Path("/admin/user")
@@ -83,7 +108,8 @@ class AdminUserResource {
         USER_LAST_ACTIVE_TIME.LAST_ACTIVE_TIME,
         USER.ACCOUNT_CREATION_TIME,
         USER.AFFILIATION,
-        USER.JOINING_REASON
+        USER.JOINING_REASON,
+        USER.PERMISSION
       )
       .from(USER)
       .leftJoin(USER_LAST_ACTIVE_TIME)
@@ -104,6 +130,7 @@ class AdminUserResource {
     updatedUser.setEmail(user.getEmail)
     updatedUser.setRole(user.getRole)
     updatedUser.setComment(user.getComment)
+    updatedUser.setPermission(user.getPermission)
     userDao.update(updatedUser)
 
     if (roleChanged)
@@ -149,5 +176,18 @@ class AdminUserResource {
   @Path("/deleteCollection/{eid}")
   def deleteCollection(@PathParam("eid") eid: Integer): Unit = {
     deleteExecutionCollection(eid)
+  }
+
+  /**
+    * Returns the permission template that describes all available user permissions
+    * including their types, possible values, and default values.
+    *
+    * @return PermissionTemplate containing the schema for all permissions
+    */
+  @GET
+  @Path("/permission")
+  @Produces(Array(MediaType.APPLICATION_JSON))
+  def getPermissionTemplate(): PermissionTemplate = {
+    AdminUserResource.permissionTemplate
   }
 }
