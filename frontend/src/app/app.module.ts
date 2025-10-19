@@ -183,6 +183,7 @@ import { ChatAssistantMultiAgentComponent } from "./workspace/component/left-pan
 import { FormlyRepeatDndComponent } from "./common/formly/repeat-dnd/repeat-dnd.component";
 import { NzInputNumberModule } from "ng-zorro-antd/input-number";
 import { NzCheckboxModule } from "ng-zorro-antd/checkbox";
+import { PermissionEditModalComponent } from "./dashboard/component/admin/user/permission-edit-modal/permission-edit-modal.component";
 
 registerLocaleData(en);
 
@@ -282,6 +283,7 @@ registerLocaleData(en);
     ComputingUnitSelectionComponent,
     AdminSettingsComponent,
     ChatAssistantMultiAgentComponent,
+    PermissionEditModalComponent,
   ],
   imports: [
     BrowserModule,
