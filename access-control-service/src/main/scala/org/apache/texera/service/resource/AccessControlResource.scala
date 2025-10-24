@@ -27,7 +27,9 @@ import org.apache.texera.auth.JwtParser.parseToken
 import org.apache.texera.auth.SessionUser
 import org.apache.texera.auth.util.{ComputingUnitAccess, HeaderField}
 import org.apache.texera.config.{GuiConfig, KubernetesConfig, LLMConfig}
+import org.apache.texera.dao.SqlServer
 import org.apache.texera.dao.jooq.generated.enums.PrivilegeEnum
+import org.apache.texera.dao.jooq.generated.tables.daos.UserDao
 
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
@@ -38,6 +40,9 @@ import scala.util.matching.Regex
 object AccessControlResource extends LazyLogging {
 
   private val mapper: ObjectMapper = new ObjectMapper().registerModule(DefaultScalaModule)
+
+  private lazy val context = SqlServer.getInstance().createDSLContext()
+  private lazy val userDao = new UserDao(context.configuration)
 
   // Regex for the paths that require authorization
   private val wsapiWorkflowWebsocket: Regex = """.*/wsapi/workflow-websocket.*""".r
@@ -61,9 +66,10 @@ object AccessControlResource extends LazyLogging {
     logger.info(s"Authorizing request for path: $path")
 
     path match {
-      case wsapiWorkflowWebsocket() | wsapiCuSsh() | apiExecutionsStats() |
-          apiExecutionsResultExport() =>
-        checkComputingUnitAccess(uriInfo, headers, bodyOpt)
+      case wsapiCuSsh() =>
+        checkComputingUnitAccess(uriInfo, headers, bodyOpt, requireSshPermission = true)
+      case wsapiWorkflowWebsocket() | apiExecutionsStats() | apiExecutionsResultExport() =>
+        checkComputingUnitAccess(uriInfo, headers, bodyOpt, requireSshPermission = false)
       case _ =>
         logger.warn(s"No authorization logic for path: $path. Denying access.")
         Response.status(Response.Status.FORBIDDEN).build()
@@ -73,7 +79,8 @@ object AccessControlResource extends LazyLogging {
   private def checkComputingUnitAccess(
       uriInfo: UriInfo,
       headers: HttpHeaders,
-      bodyOpt: Option[String]
+      bodyOpt: Option[String],
+      requireSshPermission: Boolean = false
   ): Response = {
     val queryParams: Map[String, String] = uriInfo
       .getQueryParameters()
@@ -117,6 +124,44 @@ object AccessControlResource extends LazyLogging {
       cuAccess = ComputingUnitAccess.getComputingUnitAccess(cuidInt, uid)
       if (cuAccess == PrivilegeEnum.NONE)
         return Response.status(Response.Status.FORBIDDEN).build()
+
+      // Check SSH permission if required
+      if (requireSshPermission) {
+        // Fetch user from database to get the permission field (not included in JWT)
+        val userFromDb = userDao.fetchOneByUid(uid)
+        if (userFromDb == null) {
+          logger.error(s"User $uid not found in database")
+          return Response.status(Response.Status.FORBIDDEN).build()
+        }
+
+        val permissionJson: String =
+          Option(userFromDb.getPermission).map(_.toString).getOrElse("{}")
+        logger.info(s"Checking SSH permission for user $uid. Permission JSON: $permissionJson")
+        var hasSshPermission = false
+        try {
+          val permissionNode = mapper.readTree(permissionJson)
+          logger.info(s"Parsed permission node: $permissionNode")
+          if (permissionNode != null && permissionNode.has("sshToComputingUnit")) {
+            hasSshPermission = permissionNode.get("sshToComputingUnit").asBoolean()
+            logger.info(s"SSH permission value: $hasSshPermission")
+          } else {
+            logger.warn(s"Permission node is null or does not have sshToComputingUnit field")
+          }
+        } catch {
+          case e: Exception =>
+            logger.error(s"Failed parsing permission JSON: " + e.getMessage, e)
+            return Response.status(Response.Status.FORBIDDEN).build()
+        }
+
+        if (!hasSshPermission) {
+          logger.warn(
+            s"User $uid does not have SSH permission to computing unit. hasSshPermission=$hasSshPermission"
+          )
+          return Response.status(Response.Status.FORBIDDEN).build()
+        } else {
+          logger.info(s"User $uid has SSH permission to computing unit")
+        }
+      }
     } catch {
       case e: Exception =>
         logger.error(s"Failed parsing token $e")
