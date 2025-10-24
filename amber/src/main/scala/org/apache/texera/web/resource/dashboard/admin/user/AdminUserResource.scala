@@ -19,6 +19,7 @@
 
 package org.apache.texera.web.resource.dashboard.admin.user
 
+import org.apache.texera.auth.{PermissionTemplate, UserPermission}
 import org.apache.texera.dao.SqlServer
 import org.apache.texera.dao.jooq.generated.enums.UserRoleEnum
 import org.apache.texera.dao.jooq.generated.tables.User.USER
@@ -49,36 +50,11 @@ case class UserInfo(
     permission: String // JSON string representing user permissions
 )
 
-// Permission field schema definition
-case class PermissionFieldSchema(
-    fieldType: String, // "boolean", "number", or "string"
-    possibleValues: List[Any], // List of possible values, empty list if not a category field
-    defaultValue: Any, // Default value for this permission
-    description: String // Human-readable description of what this permission does
-)
-
-// Permission template containing all available permissions
-case class PermissionTemplate(
-    permissions: Map[String, PermissionFieldSchema]
-)
-
 object AdminUserResource {
   final private lazy val context = SqlServer
     .getInstance()
     .createDSLContext()
   final private lazy val userDao = new UserDao(context.configuration)
-
-  // Define the permission template with all available permissions
-  val permissionTemplate: PermissionTemplate = PermissionTemplate(
-    permissions = Map(
-      "sshToComputingUnit" -> PermissionFieldSchema(
-        fieldType = "boolean",
-        possibleValues = List(true, false),
-        defaultValue = false,
-        description = "Allow user to access SSH terminal for computing units they have access to"
-      )
-    )
-  )
 }
 
 @Path("/admin/user")
@@ -183,7 +159,7 @@ class AdminUserResource {
   @GET
   @Path("/permission")
   @Produces(Array(MediaType.APPLICATION_JSON))
-  def getPermissionTemplate(): PermissionTemplate = {
-    AdminUserResource.permissionTemplate
+  def getPermissionTemplate: PermissionTemplate = {
+    UserPermission.permissionTemplate
   }
 }
