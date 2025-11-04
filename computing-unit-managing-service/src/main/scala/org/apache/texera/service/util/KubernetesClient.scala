@@ -129,9 +129,9 @@ object KubernetesClient {
       .withNewSpec()
 
     // Only add runtimeClassName when using NVIDIA GPU
-    //if (gpuLimit != "0" && KubernetesConfig.gpuResourceKey.contains("nvidia")) {
-    //specBuilder.withRuntimeClassName("nvidia")
-    //}
+    if (gpuLimit != "0" && KubernetesConfig.gpuResourceKey.contains("nvidia")) {
+      specBuilder.withRuntimeClassName("nvidia")
+    }
 
     val containerBuilder = specBuilder
       .addNewContainer()
