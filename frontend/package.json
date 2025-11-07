@@ -22,6 +22,7 @@
   "private": true,
   "dependencies": {
     "@abacritt/angularx-social-login": "2.3.0",
+    "@ai-sdk/openai": "2.0.52",
     "@ali-hm/angular-tree-component": "12.0.5",
     "@angular/animations": "16.2.12",
     "@angular/cdk": "16.2.12",
@@ -45,12 +46,14 @@
     "@stoplight/json-ref-resolver": "3.1.5",
     "@types/lodash-es": "4.17.4",
     "@types/plotly.js-basic-dist-min": "2.12.4",
+    "ai": "^5.0.76",
     "ajv": "8.10.0",
     "backbone": "1.4.1",
     "concaveman": "2.0.0",
     "content-disposition": "0.5.4",
     "d3": "6.4.0",
     "dagre": "0.8.5",
+    "deep-chat": "^2.2.2",
     "deep-map": "2.0.0",
     "edit-distance": "1.0.4",
     "es6-weak-map": "2.0.3",
@@ -94,6 +97,7 @@
     "y-quill": "0.1.5",
     "y-websocket": "1.4.0",
     "yjs": "13.5.41",
+    "zod": "^3.25.76",
     "zone.js": "0.13.0"
   },
   "resolutions": {
@@ -127,6 +131,7 @@
     "@types/quill": "2.0.9",
     "@types/uuid": "8.3.4",
     "@types/validator": "13.12.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "7.0.2",
     "@typescript-eslint/parser": "7.0.2",
     "babel-plugin-dynamic-import-node": "2.3.3",

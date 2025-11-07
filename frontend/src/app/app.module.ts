@@ -20,7 +20,7 @@
 import { DatePipe, registerLocaleData } from "@angular/common";
 import { HTTP_INTERCEPTORS, HttpClientModule } from "@angular/common/http";
 import en from "@angular/common/locales/en";
-import { APP_INITIALIZER, NgModule } from "@angular/core";
+import { APP_INITIALIZER, NgModule, CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { FormsModule, ReactiveFormsModule } from "@angular/forms";
 import { BrowserModule } from "@angular/platform-browser";
 import { BrowserAnimationsModule } from "@angular/platform-browser/animations";
@@ -100,9 +100,13 @@ import { NzPopconfirmModule } from "ng-zorro-antd/popconfirm";
 import { AdminGuardService } from "./dashboard/service/admin/guard/admin-guard.service";
 import { ContextMenuComponent } from "./workspace/component/workflow-editor/context-menu/context-menu/context-menu.component";
 import { CoeditorUserIconComponent } from "./workspace/component/menu/coeditor-user-icon/coeditor-user-icon.component";
+import { AgentPanelComponent } from "./workspace/component/agent-panel/agent-panel.component";
+import { AgentChatComponent } from "./workspace/component/agent-panel/agent-chat/agent-chat.component";
+import { AgentRegistrationComponent } from "./workspace/component/agent-panel/agent-registration/agent-registration.component";
 import { InputAutoCompleteComponent } from "./workspace/component/input-autocomplete/input-autocomplete.component";
 import { DirectoryPathInputComponent } from "./workspace/component/directory-path-input/directory-path-input.component";
 import { CollabWrapperComponent } from "./common/formly/collab-wrapper/collab-wrapper/collab-wrapper.component";
+import { TexeraCopilot } from "./workspace/service/copilot/texera-copilot";
 import { NzSwitchModule } from "ng-zorro-antd/switch";
 import { AboutComponent } from "./hub/component/about/about.component";
 import { NzLayoutModule } from "ng-zorro-antd/layout";
@@ -131,6 +135,7 @@ import { WorkflowRuntimeStatisticsComponent } from "./dashboard/component/user/u
 import { TimeTravelComponent } from "./workspace/component/left-panel/time-travel/time-travel.component";
 import { NzMessageModule } from "ng-zorro-antd/message";
 import { NzModalModule } from "ng-zorro-antd/modal";
+import { NzDescriptionsModule } from "ng-zorro-antd/descriptions";
 import { OverlayModule } from "@angular/cdk/overlay";
 import { HighlightSearchTermsPipe } from "./dashboard/component/user/user-workflow/user-workflow-list-item/highlight-search-terms.pipe";
 import { en_US, provideNzI18n } from "ng-zorro-antd/i18n";
@@ -184,6 +189,7 @@ import { FormlyRepeatDndComponent } from "./common/formly/repeat-dnd/repeat-dnd.
 import { NzInputNumberModule } from "ng-zorro-antd/input-number";
 import { NzCheckboxModule } from "ng-zorro-antd/checkbox";
 import { PermissionEditModalComponent } from "./dashboard/component/admin/user/permission-edit-modal/permission-edit-modal.component";
+import "deep-chat";
 
 registerLocaleData(en);
 
@@ -250,6 +256,9 @@ registerLocaleData(en);
     LocalLoginComponent,
     ContextMenuComponent,
     CoeditorUserIconComponent,
+    AgentPanelComponent,
+    AgentChatComponent,
+    AgentRegistrationComponent,
     InputAutoCompleteComponent,
     DirectoryPathInputComponent,
     FileSelectionComponent,
@@ -323,6 +332,7 @@ registerLocaleData(en);
     NgxJsonViewerModule,
     NzMessageModule,
     NzModalModule,
+    NzDescriptionsModule,
     NzCardModule,
     NzTagModule,
     NzPopconfirmModule,
@@ -361,6 +371,7 @@ registerLocaleData(en);
     GuiConfigService,
     FileSaverService,
     ReportGenerationService,
+    TexeraCopilot,
     {
       provide: HTTP_INTERCEPTORS,
       useClass: BlobErrorHttpInterceptor,
@@ -397,5 +408,6 @@ registerLocaleData(en);
     },
   ],
   bootstrap: [AppComponent],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class AppModule {}
