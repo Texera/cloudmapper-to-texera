@@ -112,6 +112,56 @@ class ProcessTableOperator(UDFTableOperator):
         yield filtered
 \`\`\`
 
+### How to use R UDF Operator
+
+R UDF runs custom R scripts within the workflow. You can choose between Table API and Tuple API modes.
+
+### Table API
+Table API passes the entire input as an R data frame to your function and expects a data frame in return.
+
+**Template:**
+\`\`\`r
+function(table, port) {
+  return(table)
+}
+\`\`\`
+
+**Example – Keep rows where quantities align and net value is valid:**
+\`\`\`r
+function(table, port) {
+  valid_qty <- !is.na(table$KWMENG) & !is.na(table$KBMENG) & table$KWMENG <= table$KBMENG
+  valid_value <- !is.na(table$NET_VALUE) & table$NET_VALUE >= 0
+
+  valid_rows <- valid_qty & valid_value
+  return(table[valid_rows, , drop = FALSE])
+}
+\`\`\`
+
+### Tuple API
+Tuple API uses \`coro::generator\` to yield tuples (lists) one by one.
+
+**Template:**
+\`\`\`r
+library(coro)
+
+coro::generator(function(tuple, port) {
+  yield(tuple)
+})
+\`\`\`
+
+**Example – Emit tuples that flag problematic status values:**
+\`\`\`r
+library(coro)
+
+coro::generator(function(tuple, port) {
+  status <- tuple$STATUS
+
+  if (!is.null(status) && status == "ERROR") {
+    yield(tuple)
+  }
+})
+\`\`\`
+
 ### Important Rules for PythonUDFV2
 
 **MUST follow these rules:**
@@ -130,6 +180,16 @@ class ProcessTableOperator(UDFTableOperator):
 - **ONLY CHANGE THE CODE** - when editing Python UDF, only change the python code properties, DO NOT CHANGE OTHER PROPERTIES
 - **Be careful with the output Columns** - If you uncheck the option to not keep the input columns, the output columns will be those you yield in the code; If you check that option, your yield tuples or dataframes will need to keep the input columns. Just be careful.
 - **Specify Extra Columns** - If you add extra columns, you MUST specify them in the UDF properties as Extra Output Columns
+
+### Important Rules for R UDF
+
+- **Respect signatures** - Return a \`function(table, port)\` for Table API; use \`coro::generator(function(tuple, port) { ... })\` for Tuple API.
+- **Load libraries explicitly** - Call \`library(...)\` for any packages you rely on (e.g., \`coro\`, \`dplyr\`).
+- **Handle NA carefully** - Check for \`is.na\` before comparisons or arithmetic.
+- **Yield correctly** - Inside Tuple API generators, call \`yield\` for each tuple you want to emit; do not return lists manually.
+- **Align output schema** - Keep outputs consistent with \`Retain input columns\` and \`Extra output column(s)\` settings.
+- **Keep scripts focused** - Implement one logical check per UDF; keep code concise and auditable.
+- **Property discipline** - Unless absolutely necessary, only modify the script code field; adjust other properties only when prompted.
 
 ## General Guidelines
 - **Use the native operators as much as you can!!** They are more intuitive and easy to configure than Python UDF;
