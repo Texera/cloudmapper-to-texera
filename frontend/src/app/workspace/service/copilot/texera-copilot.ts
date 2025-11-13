@@ -266,7 +266,11 @@ export class TexeraCopilot {
         this.setState(CopilotState.GENERATING);
 
         const userMessage: UserModelMessage = { role: "user", content: message };
-        this.messages.push(userMessage);
+
+        // Create a copy of current messages array to send to generateText
+        // This prevents race conditions and mutations during generation
+        const messagesToSend = [...this.messages, userMessage];
+
         const userUIMessage: AgentUIMessage = {
           role: "user",
           content: message,
@@ -282,7 +286,7 @@ export class TexeraCopilot {
 
           const { response } = await generateText({
             model: this.model,
-            messages: this.messages,
+            messages: messagesToSend,
             tools,
             system: COPILOT_SYSTEM_PROMPT,
             stopWhen: ({ steps }) => {
@@ -312,6 +316,10 @@ export class TexeraCopilot {
               isFirstStep = false;
             },
           });
+
+          // Only append to this.messages after successful generation
+          // This prevents corruption if generation fails midway
+          this.messages.push(userMessage);
           this.messages.push(...response.messages);
           this.agentResponsesSubject.next([...this.agentResponses]);
 
@@ -320,6 +328,9 @@ export class TexeraCopilot {
           this.setState(CopilotState.AVAILABLE);
           const errorText = `Error: ${err?.message ?? String(err)}`;
           const assistantError: AssistantModelMessage = { role: "assistant", content: errorText };
+
+          // On error, still append the user message and error message to maintain conversation history
+          this.messages.push(userMessage);
           this.messages.push(assistantError);
 
           const errorResponse: AgentUIMessage = {
@@ -470,3 +481,4 @@ export class TexeraCopilot {
     }));
   }
 }
+
