@@ -43,16 +43,12 @@ RUN unzip amber/target/universal/amber-*.zip -d amber/target/
 
 FROM eclipse-temurin:11-jdk-jammy AS runtime
 
-# Build argument to enable/disable R support (default: true for backward compatibility)
-ARG WITH_R_SUPPORT=false
-
 WORKDIR /texera/amber
 
-COPY --from=build /texera/amber/r-requirements.txt /tmp/r-requirements.txt
 COPY --from=build /texera/amber/requirements.txt /tmp/requirements.txt
 COPY --from=build /texera/amber/operator-requirements.txt /tmp/operator-requirements.txt
 
-# Install Python runtime dependencies (always) and R runtime dependencies (conditional)
+# Install Python runtime dependencies
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-dev \

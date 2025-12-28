@@ -1,4 +1,4 @@
-package org.apache.texera.workflow.operators.cloudmapper
+package org.apache.amber.operator.cloudmapper
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.kjetland.jackson.jsonSchema.annotations.{
@@ -6,7 +6,7 @@ import com.kjetland.jackson.jsonSchema.annotations.{
   JsonSchemaString,
   JsonSchemaTitle
 }
-import org.apache.amber.operator.metadata.annotations.HideAnnotation
+import org.apache.texera.amber.operator.metadata.annotations.HideAnnotation
 
 class ReferenceGenome {
   // Required field for selecting a reference genome.

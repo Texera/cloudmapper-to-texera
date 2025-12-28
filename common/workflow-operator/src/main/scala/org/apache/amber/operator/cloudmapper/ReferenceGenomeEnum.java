@@ -1,4 +1,4 @@
-package org.apache.texera.workflow.operators.cloudmapper;
+package org.apache.amber.operator.cloudmapper;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 

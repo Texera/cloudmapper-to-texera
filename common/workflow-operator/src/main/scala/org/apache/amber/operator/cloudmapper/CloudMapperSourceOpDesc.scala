@@ -2,12 +2,11 @@ package org.apache.amber.operator.cloudmapper
 
 import com.fasterxml.jackson.annotation.{JsonProperty, JsonPropertyDescription}
 import com.kjetland.jackson.jsonSchema.annotations.JsonSchemaTitle
-import org.apache.amber.core.storage.{DocumentFactory, FileResolver}
-import org.apache.amber.core.tuple.{Attribute, AttributeType, Schema}
-import org.apache.amber.core.workflow.{OutputPort, PortIdentity}
-import org.apache.amber.operator.metadata.{OperatorGroupConstants, OperatorInfo}
-import org.apache.amber.operator.source.PythonSourceOperatorDescriptor
-import org.apache.texera.workflow.operators.cloudmapper.{ReferenceGenome, ReferenceGenomeEnum}
+import org.apache.texera.amber.core.tuple.{Attribute, AttributeType, Schema}
+import org.apache.texera.amber.core.workflow.{OutputPort, PortIdentity}
+import org.apache.texera.amber.operator.metadata.{OperatorGroupConstants, OperatorInfo}
+import org.apache.texera.amber.operator.source.PythonSourceOperatorDescriptor
+import org.apache.texera.amber.core.storage.{DocumentFactory, FileResolver}
 
 class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
   @JsonProperty(required = true)
