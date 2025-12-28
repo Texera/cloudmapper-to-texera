@@ -1,4 +1,4 @@
-package org.apache.amber.core.storage.model
+package org.apache.texera.amber.core.storage.model
 
 import org.apache.texera.amber.core.storage.util.dataset.GitVersionControlLocalFileStorage
 import org.apache.texera.dao.SqlServer

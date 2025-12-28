@@ -1,6 +1,6 @@
 package org.apache.texera.amber.operator.util
 
-import org.apache.amber.core.storage.model.DatasetDirectoryDocument
+import org.apache.texera.amber.core.storage.model.DatasetDirectoryDocument
 
 import java.nio.file.Paths
 
