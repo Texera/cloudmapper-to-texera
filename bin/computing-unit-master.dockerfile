@@ -115,7 +115,7 @@ RUN if [ "$WITH_R_SUPPORT" = "true" ]; then \
 # Install R packages, pinning arrow to 14.0.2.1 explicitly (conditional)
 RUN if [ "$WITH_R_SUPPORT" = "true" ]; then \
         Rscript -e "options(repos = c(CRAN = 'https://cran.r-project.org')); \
-                    install.packages(c('coro', 'dplyr'), \
+                    install.packages(c('coro', 'dplyr', 'aws.s3'), \
                                      Ncpus = parallel::detectCores())" && \
         Rscript -e "options(repos = c(CRAN = 'https://cran.r-project.org')); \
                     if (!requireNamespace('remotes', quietly=TRUE)) \
