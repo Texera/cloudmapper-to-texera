@@ -62,7 +62,7 @@ spec:
               value: http://{{ .Values.fileService.name }}-svc:9092/api/dataset/list-directory-objects
             - name: FILE_SERVICE_UPLOAD_ONE_FILE_TO_DATASET_ENDPOINT
               value: http://{{ .Values.fileService.name }}-svc:9092/api/dataset/did/upload
-	    # S3 Access (for R UDF large binary support)
+            # S3 Access (for R UDF large binary support)
             - name: STORAGE_S3_ENDPOINT
               value: http://{{ .Release.Name }}-minio:9000
             - name: STORAGE_S3_AUTH_USERNAME
