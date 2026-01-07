@@ -109,9 +109,11 @@ class RTupleExecutor(TupleOperatorV2):
                 AWS_DEFAULT_REGION = s3_region
             )
             
+            # For MinIO and other S3-compatible services, don't use region in hostname
+            # Set region to empty string to prevent region-based URL construction
             list(
                 endpoint = s3_endpoint,
-                region = s3_region,
+                region = "",  # Empty region for MinIO to avoid region.hostname construction
                 username = s3_username,
                 password = s3_password,
                 base_url = sub("^https?://", "", s3_endpoint),
@@ -180,17 +182,69 @@ class RTupleExecutor(TupleOperatorV2):
             parsed <- parse_s3_uri(uri)
             config <- setup_s3_config()
             
-            # Create streaming connection (downloads on-demand)
+            # Download file to temp location first, then create connection
+            # This is more reliable than s3connection which doesn't work well with MinIO
             tryCatch({
-                s3connection(
+                temp_file <- tempfile()
+                save_object(
                     object = parsed$object_key,
                     bucket = parsed$bucket,
-                    region = config$region,
+                    file = temp_file,
                     base_url = config$base_url,
                     use_https = config$use_https,
+                    region = config$region,
                     key = config$username,
                     secret = config$password
                 )
+                
+                file_conn <- file(temp_file, open = "rb")
+                closed <- FALSE
+                
+                # Standard I/O methods (consistent with Python API)
+                read_func <- function(n = -1) {
+                    if (closed) stop("I/O operation on closed stream")
+                    readBin(file_conn, "raw", n = n)
+                }
+                
+                readline_func <- function(size = -1) {
+                    if (closed) stop("I/O operation on closed stream")
+                    readLines(file_conn, n = 1, warn = FALSE)
+                }
+                
+                readable_func <- function() {
+                    return(!closed)
+                }
+                
+                seekable_func <- function() {
+                    return(FALSE)  # Consistent with Python - no seeking support
+                }
+                
+                close_func <- function() {
+                    if (!closed) {
+                        closed <<- TRUE
+                        close(file_conn)
+                        unlink(temp_file)
+                    }
+                }
+                
+                closed_func <- function() {
+                    return(closed)
+                }
+                
+                stream_obj <- list(
+                    # Standard I/O interface (matches Python API)
+                    read = read_func,
+                    readline = readline_func,
+                    readable = readable_func,
+                    seekable = seekable_func,
+                    close = close_func,
+                    closed = closed_func,
+                    # R-specific extensions for direct file access
+                    file_path = temp_file,
+                    file_conn = file_conn
+                )
+                class(stream_obj) <- "LargeBinaryInputStream"
+                return(stream_obj)
             }, error = function(e) {
                 stop("Failed to open streaming connection for ", uri, ": ", conditionMessage(e))
             })
@@ -207,18 +261,41 @@ class RTupleExecutor(TupleOperatorV2):
             file_conn <- file(temp_file, open = "wb")
             closed <- FALSE
             
+            # Standard I/O methods (consistent with Python API)
             write_func <- function(data) {
                 if (closed) stop("I/O operation on closed stream")
                 writeBin(data, file_conn)
+                return(length(data))  # Return bytes written (consistent with Python)
+            }
+            
+            writable_func <- function() {
+                return(!closed)
+            }
+            
+            seekable_func <- function() {
+                return(FALSE)  # Consistent with Python - no seeking support
+            }
+            
+            flush_func <- function() {
+                if (!closed) {
+                    flush(file_conn)
+                }
+            }
+            
+            closed_func <- function() {
+                return(closed)
             }
             
             # Uploads to S3 and cleans up
             close_func <- function() {
                 if (!closed) {
                     closed <<- TRUE
+                    flush(file_conn)
                     close(file_conn)
                     
                     tryCatch({
+                        # Use multipart upload for better performance with large files
+                        # Default part size of 50MB is a good balance
                         put_object(
                             file = temp_file,
                             object = parsed$object_key,
@@ -227,7 +304,9 @@ class RTupleExecutor(TupleOperatorV2):
                             use_https = config$use_https,
                             region = config$region,
                             key = config$username,
-                            secret = config$password
+                            secret = config$password,
+                            multipart = TRUE,
+                            part_size = 50 * 1024 * 1024  # 50MB parts
                         )
                     }, error = function(e) {
                         unlink(temp_file)
@@ -237,7 +316,18 @@ class RTupleExecutor(TupleOperatorV2):
                 }
             }
             
-            stream_obj <- list(write = write_func, close = close_func)
+            stream_obj <- list(
+                # Standard I/O interface (matches Python API)
+                write = write_func,
+                writable = writable_func,
+                seekable = seekable_func,
+                flush = flush_func,
+                close = close_func,
+                closed = closed_func,
+                # R-specific extensions for direct file access
+                file_path = temp_file,
+                file_conn = file_conn
+            )
             class(stream_obj) <- "LargeBinaryOutputStream"
             return(stream_obj)
         }
