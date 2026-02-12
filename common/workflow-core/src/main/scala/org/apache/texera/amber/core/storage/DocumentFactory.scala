@@ -90,8 +90,8 @@ object DocumentFactory {
               overrideIfExists = true
             )
             val serde: (IcebergSchema, Tuple) => Record = IcebergUtil.toGenericRecord
-            val deserde: (IcebergSchema, Record) => Tuple = (_, record) =>
-              IcebergUtil.fromRecord(record, schema)
+            val deserde: (IcebergSchema, Record) => Tuple = (schema, record) =>
+              IcebergUtil.fromRecord(record, IcebergUtil.fromIcebergSchema(schema))
 
             new IcebergDocument[Tuple](
               namespace,
@@ -147,8 +147,8 @@ object DocumentFactory {
 
             val amberSchema = IcebergUtil.fromIcebergSchema(table.schema())
             val serde: (IcebergSchema, Tuple) => Record = IcebergUtil.toGenericRecord
-            val deserde: (IcebergSchema, Record) => Tuple = (_, record) =>
-              IcebergUtil.fromRecord(record, amberSchema)
+            val deserde: (IcebergSchema, Record) => Tuple = (schema, record) =>
+              IcebergUtil.fromRecord(record, IcebergUtil.fromIcebergSchema(schema))
 
             (
               new IcebergDocument[Tuple](
