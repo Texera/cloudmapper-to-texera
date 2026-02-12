@@ -43,12 +43,15 @@ RUN unzip amber/target/universal/amber-*.zip -d amber/target/
 
 FROM eclipse-temurin:11-jdk-jammy AS runtime
 
+# Build argument to enable/disable R support (default: false)
+ARG WITH_R_SUPPORT=false
+
 WORKDIR /texera/amber
 
 COPY --from=build /texera/amber/requirements.txt /tmp/requirements.txt
 COPY --from=build /texera/amber/operator-requirements.txt /tmp/operator-requirements.txt
 
-# Install Python runtime dependencies
+# Install Python runtime dependencies (always) and R runtime dependencies (conditional)
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-dev \
@@ -74,93 +77,80 @@ RUN apt-get update && apt-get install -y \
     libtiff5-dev \
     libjpeg-dev \
     unzip \
-    openssh-client"; fi) \
+    openssh-client \
+    gnupg \
+    software-properties-common \
+    dirmngr \
+    git"; fi) \
     && apt-get clean
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget software-properties-common && \
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb && \
-    dpkg -i cuda-keyring_1.0-1_all.deb && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    cuda-toolkit-12-1 && \
-    rm -rf /var/lib/apt/lists/*
-
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH="$CUDA_HOME/bin:$PATH"
-ENV LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
-    
-# Install R and needed libraries (conditional)
-ENV R_VERSION=4.3.3
+# Install R from CRAN repository (pre-built, much faster than source compilation)
 RUN if [ "$WITH_R_SUPPORT" = "true" ]; then \
-        curl -O https://cran.r-project.org/src/base/R-4/R-${R_VERSION}.tar.gz && \
-        tar -xf R-${R_VERSION}.tar.gz && \
-        cd R-${R_VERSION} && \
-        ./configure --prefix=/usr/local \
-                    --enable-R-shlib \
-                    --with-blas \
-                    --with-lapack && \
-        make -j 4 && \
-        make install && \
-        cd .. && \
-        rm -rf R-${R_VERSION}* && R --version && pip3 install --upgrade pip setuptools wheel && \
-        pip3 install -r /tmp/requirements.txt && \
-        pip3 install -r /tmp/operator-requirements.txt && \
-        pip3 install -r /tmp/r-requirements.txt; \
-    else \
-        pip3 install --upgrade pip setuptools wheel && \
-        pip3 install -r /tmp/requirements.txt && \
-        pip3 install -r /tmp/operator-requirements.txt; \
+        # Add CRAN GPG key and repository
+        curl -fsSL https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | \
+            gpg --dearmor -o /usr/share/keyrings/cran-ubuntu-keyring.gpg && \
+        echo "deb [signed-by=/usr/share/keyrings/cran-ubuntu-keyring.gpg] https://cloud.r-project.org/bin/linux/ubuntu jammy-cran40/" | \
+            tee /etc/apt/sources.list.d/cran.list && \
+        apt-get update && \
+        apt-get install -y r-base r-base-dev && \
+        R --version; \
     fi
-# Install R packages, pinning arrow to 14.0.2.1 explicitly (conditional)
+
+# Install Python packages
+RUN pip3 install --upgrade pip setuptools wheel && \
+    pip3 install -r /tmp/requirements.txt && \
+    pip3 install -r /tmp/operator-requirements.txt
+
+# Install texera-rudf and its dependencies (conditional)
 RUN if [ "$WITH_R_SUPPORT" = "true" ]; then \
-        Rscript -e "options(repos = c(CRAN = 'https://cran.r-project.org')); \
-                    install.packages(c('coro', 'dplyr'), \
-                                     Ncpus = parallel::detectCores())" && \
+        pip3 install git+https://github.com/Texera/texera-rudf.git; \
+    fi
+
+# Install R packages with pinned versions for texera-rudf (conditional)
+RUN if [ "$WITH_R_SUPPORT" = "true" ]; then \
         Rscript -e "options(repos = c(CRAN = 'https://cran.r-project.org')); \
                     if (!requireNamespace('remotes', quietly=TRUE)) \
-                      install.packages('remotes'); \
+                      install.packages('remotes', Ncpus = parallel::detectCores()); \
                     remotes::install_version('arrow', version='14.0.2.1', \
-                      repos='https://cran.r-project.org', upgrade='never'); \
-                    cat('R arrow version: ', as.character(packageVersion('arrow')), '\n')"; \
+                      repos='https://cran.r-project.org', upgrade='never', \
+                      Ncpus = parallel::detectCores()); \
+                    remotes::install_version('coro', version='1.1.0', \
+                      repos='https://cran.r-project.org', upgrade='never', \
+                      Ncpus = parallel::detectCores()); \
+                    remotes::install_version('aws.s3', version='0.3.22', \
+                      repos='https://cran.r-project.org', upgrade='never', \
+                      Ncpus = parallel::detectCores()); \
+                    cat('R package versions:\n'); \
+                    cat('  arrow: ', as.character(packageVersion('arrow')), '\n'); \
+                    cat('  coro: ', as.character(packageVersion('coro')), '\n'); \
+                    cat('  aws.s3: ', as.character(packageVersion('aws.s3')), '\n')"; \
+        # Set CRAN repository and install all necessary CRAN packages in parallel
+        Rscript -e "options(repos = c(CRAN = 'https://cran.r-project.org')); \
+        install.packages(c('BiocManager', 'R.utils', 'ggplotify', 'bench', 'reticulate', 'scSorter', 'igraph', 'leiden'), \
+                 Ncpus = parallel::detectCores()) \
+        remotes::install_github('satijalab/seurat', ref = 'v5.2.1', upgrade = 'never'); \
+        remotes::install_github('immunogenomics/harmony', upgrade = 'never'); \
+        remotes::install_version('ggplot2', version = '3.5.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('future', version = '1.34.0', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('jsonlite', version = '1.9.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('later', version = '1.4.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('cluster', version = '2.1.4', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('zoo', version = '1.8-13', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('httpuv', version = '1.6.15', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('Matrix', version = '1.6-4', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('miniUI', version = '0.1.1.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('lattice', version = '0.21-8', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('survival', version = '3.5-5', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('KernSmooth', version = '2.23-21', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('globals', version = '0.16.3', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('nlme', version = '3.1-162', upgrade = 'never', repos = 'https://cran.r-project.org'); \
+        remotes::install_version('MASS', version = '7.3-60', upgrade = 'never', repos = 'https://cran.r-project.org') \
+        remotes::install_version('SeuratObject', version = '5.0.2', repos = 'https://cran.r-project.org') \
+        BiocManager::install(c('SingleCellExperiment', 'scDblFinder', 'glmGamPoi'), \
+                     Ncpus = parallel::detectCores())" \
     fi
 
-# Install remotes package
-RUN R -e "install.packages('remotes', repos = 'https://cloud.r-project.org')"
-
-# Set CRAN repository and install all necessary CRAN packages in parallel
-RUN Rscript -e "options(repos = c(CRAN = 'https://cran.r-project.org')); \
-                install.packages(c('BiocManager', 'R.utils', 'ggplotify', 'bench', 'reticulate', 'scSorter', 'igraph', 'leiden'), \
-                                 Ncpus = parallel::detectCores())"
-
-# Install R packages with specific versions and prevent upgrade prompts
-RUN R -e "options(ask = FALSE); \
-          remotes::install_github('satijalab/seurat', ref = 'v5.2.1', upgrade = 'never'); \
-          remotes::install_github('immunogenomics/harmony', upgrade = 'never'); \
-          remotes::install_version('ggplot2', version = '3.5.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('future', version = '1.34.0', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('jsonlite', version = '1.9.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('later', version = '1.4.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('cluster', version = '2.1.4', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('zoo', version = '1.8-13', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('httpuv', version = '1.6.15', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('Matrix', version = '1.6-4', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('miniUI', version = '0.1.1.1', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('lattice', version = '0.21-8', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('survival', version = '3.5-5', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('KernSmooth', version = '2.23-21', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('globals', version = '0.16.3', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('nlme', version = '3.1-162', upgrade = 'never', repos = 'https://cran.r-project.org'); \
-          remotes::install_version('MASS', version = '7.3-60', upgrade = 'never', repos = 'https://cran.r-project.org')"
-
-RUN R -e "options(ask = FALSE); \
-	  remotes::install_version('SeuratObject', version = '5.0.2', repos = 'https://cran.r-project.org')"
-
-# Install Bioconductor packages in parallel
-RUN R -e "BiocManager::install(c('SingleCellExperiment', 'scDblFinder', 'glmGamPoi'), \
-                                     Ncpus = parallel::detectCores())"
-
-ENV LD_LIBRARY_PATH=/usr/local/lib/R/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/lib/R/lib:$LD_LIBRARY_PATH
 
 # Copy the built texera binary from the build phase
 COPY --from=build /texera/.git /texera/amber/.git
