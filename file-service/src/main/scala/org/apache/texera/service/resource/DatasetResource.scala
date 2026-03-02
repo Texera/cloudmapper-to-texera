@@ -2029,7 +2029,7 @@ class DatasetResource {
       URLDecoder.decode(encodedFilePath, StandardCharsets.UTF_8.name())
     )
 
-    withTransaction(context) { ctx =>
+    val (repoName, uploadId, physicalAddr) = withTransaction(context) { ctx =>
       if (!userHasWriteAccess(ctx, did, uid)) {
         throw new ForbiddenException(ERR_USER_HAS_NO_ACCESS_TO_DATASET_MESSAGE)
       }
@@ -2065,21 +2065,6 @@ class DatasetResource {
       }
 
       val physicalAddr = Option(session.getPhysicalAddress).map(_.trim).getOrElse("")
-      if (physicalAddr.isEmpty) {
-        throw new WebApplicationException(
-          "Upload session is missing physicalAddress. Restart the upload.",
-          Response.Status.INTERNAL_SERVER_ERROR
-        )
-      }
-
-      withLakeFSErrorHandling {
-        LakeFSStorageClient.abortPresignedMultipartUploads(
-          dataset.getRepositoryName,
-          filePath,
-          session.getUploadId,
-          physicalAddr
-        )
-      }
 
       // Delete session; parts removed via ON DELETE CASCADE
       ctx
@@ -2092,8 +2077,14 @@ class DatasetResource {
         )
         .execute()
 
-      Response.ok(Map("message" -> "Multipart upload aborted successfully")).build()
+      (dataset.getRepositoryName, session.getUploadId, physicalAddr)
     }
+
+    withLakeFSErrorHandling {
+      LakeFSStorageClient.abortPresignedMultipartUploads(repoName, filePath, uploadId, physicalAddr)
+    }
+
+    Response.ok(Map("message" -> "Multipart upload aborted successfully")).build()
   }
 
   /**
