@@ -15,9 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
+texera:
+  # Container image registry and tag for all Texera services
+  # Override these to use a different registry or version
+  imageRegistry: ghcr.io/apache
+  imageTag: latest
+
 global:
+  # Required by Bitnami sub-charts (postgresql, minio) to allow custom images
   security:
-    allowInsecureImages: true # for custom postgres image
+    allowInsecureImages: true
 
 # Persistence Configuration
 # This controls how Persistent Volumes (PVs) and Persistent Volume Claims (PVCs) are managed
@@ -33,12 +40,15 @@ persistence:
 # Part 1: the configuration of Postgres, Minio and LakeFS
 postgresql:
   image:
-    repository: texera/postgres17-pgroonga
+    repository: groonga/pgroonga
     tag: latest
     debug: true
   auth:
     postgresPassword: root_password  # for executing init script with superuser
   primary:
+    containerSecurityContext:
+      # Disabled because groonga/pgroonga needs to write a lock/socket file to /var/run/postgresql
+      readOnlyRootFilesystem: false
     livenessProbe:
       initialDelaySeconds: 30 # increase this if the launching of postgresql is slow on the cluster
     readinessProbe:
@@ -110,7 +120,7 @@ texeraImages:
 # Example data loader configuration
 exampleDataLoader:
   enabled: true
-  image: apache/texera-example-data-loader:1.1.0-incubating
+  imageName: texera-example-data-loader
   username: texera
   password: texera
   datasetDir: datasets
@@ -119,7 +129,7 @@ exampleDataLoader:
 webserver:
   name: webserver
   numOfPods: 1  # Number of pods for the Texera deployment
-  imageName: apache/texera-dashboard-service:1.1.0-incubating # image name of the texera
+  imageName: texera-dashboard-service
   service:
     type: ClusterIP
     port: 8080
@@ -128,7 +138,7 @@ workflowComputingUnitManager:
   name: workflow-computing-unit-manager
   numOfPods: 1
   serviceAccountName: workflow-computing-unit-manager-service-account
-  imageName: apache/texera-workflow-computing-unit-managing-service:1.1.0-incubating
+  imageName: texera-workflow-computing-unit-managing-service
   service:
     type: ClusterIP
     port: 8888
@@ -136,7 +146,7 @@ workflowComputingUnitManager:
 workflowCompilingService:
   name: workflow-compiling-service
   numOfPods: 1
-  imageName: apache/texera-workflow-compiling-service:1.1.0-incubating
+  imageName: texera-workflow-compiling-service
   service:
     type: ClusterIP
     port: 9090
@@ -144,7 +154,7 @@ workflowCompilingService:
 fileService:
   name: file-service
   numOfPods: 1
-  imageName: apache/texera-file-service:1.1.0-incubating
+  imageName: texera-file-service
   service:
     type: ClusterIP
     port: 9092
@@ -152,7 +162,7 @@ fileService:
 configService:
   name: config-service
   numOfPods: 1
-  imageName: apache/texera-config-service:1.1.0-incubating
+  imageName: texera-config-service
   service:
     type: ClusterIP
     port: 9094
@@ -169,7 +179,7 @@ chatAssistantService:
 accessControlService:
   name: access-control-service
   numOfPods: 1
-  imageName: apache/texera-access-control-service:1.1.0-incubating
+  imageName: texera-access-control-service
   service:
     type: ClusterIP
     port: 9096
@@ -186,7 +196,7 @@ workflowComputingUnitPool:
     cpu: 100
     memory: 100Gi
     nvidiaGpu: 5
-  imageName: apache/texera-workflow-execution-coordinator:1.1.0-incubating
+  imageName: texera-workflow-execution-coordinator
   service:
     port: 8085
     targetPort: 8085
@@ -286,55 +296,6 @@ gatewayConfig:
   # The hostname for the Gateway listener (HTTP/HTTPS).
   # e.g., "texera.example.com"
   hostname: ""
-  # Optional TLS secret (manually created)
-  tlsSecretName: ""  # e.g., "texera-tls"
-  # Optional Issuer name for cert-manager
-  issuer: ""  # e.g., "letsencrypt-prod"
-  paths:
-    - path: /api/computing-unit
-      serviceName: workflow-computing-unit-manager-svc
-      servicePort: 8888
-    - path: /api/compile
-      serviceName: workflow-compiling-service-svc
-      servicePort: 9090
-    - path: /api/dataset
-      serviceName: file-service-svc
-      servicePort: 9092
-    - path: /api/access/dataset
-      serviceName: file-service-svc
-      servicePort: 9092
-    - path: /api/access/computing-unit
-      serviceName: workflow-computing-unit-manager-svc
-      servicePort: 8888
-    - path: /api/config
-      serviceName: config-service-svc
-      servicePort: 9094
-    - path: /wsapi/workflow-websocket
-      serviceName: envoy-svc
-      servicePort: 10000
-    - path: /api/executions/*/stats/*
-      pathType: ImplementationSpecific
-      serviceName: envoy-svc
-      servicePort: 10000
-    - path: /api/executions/result/export/*
-      pathType: ImplementationSpecific
-      serviceName: envoy-svc
-      servicePort: 10000
-    - path: /api
-      serviceName: webserver-svc
-      servicePort: 8080
-    - path: /rtc
-      serviceName: y-websocket-server-svc
-      servicePort: 1234
-    - path: /python-language-server
-      serviceName: python-language-server-svc
-      servicePort: 3000
-    - path: /chat-assistant
-      serviceName: chat-assistant-service-svc
-      servicePort: 8001
-    - path: /
-      serviceName: webserver-svc
-      servicePort: 8080
 
   # The name of the cert-manager Issuer or ClusterIssuer to use for obtaining certificates.
   # This requires cert-manager to be installed in the cluster.
@@ -360,4 +321,8 @@ envoy-gateway:
     envoyGateway:
       extensionApis:
         enableBackend: true
+<<<<<<< HEAD
         enableEnvoyPatchPolicy: true
+=======
+        enableEnvoyPatchPolicy: true
+>>>>>>> 349a1aa18b4c3458c3f6a14b0ea834986fe69093
