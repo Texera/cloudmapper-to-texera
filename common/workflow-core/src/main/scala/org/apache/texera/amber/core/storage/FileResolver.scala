@@ -260,10 +260,13 @@ object FileResolver {
         (dataset, datasetVersion)
       }
 
-    // Build the format /{datasetName}/{versionHash}/, both Linux and Windows use forward slash as the splitter
+    // Build the format /{repositoryName}/{versionHash}/, both Linux and Windows use forward slash as the splitter
+    // Must use dataset.getRepositoryName (e.g. "dataset-15") — not the user-visible datasetName —
+    // so that DatasetFileDocument.getRepositoryName() returns the actual LakeFS repository name
+    // used by every subsequent LakeFS / FileService call (presign URL, list-directory-objects).
     val uriSplitter = "/"
     val encodedPath =
-      uriSplitter + datasetName + uriSplitter + datasetVersion.getVersionHash + uriSplitter
+      uriSplitter + dataset.getRepositoryName + uriSplitter + datasetVersion.getVersionHash + uriSplitter
 
     try {
       new URI(DATASET_FILE_URI_SCHEME, "", encodedPath, null)

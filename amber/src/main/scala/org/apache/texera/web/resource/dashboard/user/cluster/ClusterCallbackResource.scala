@@ -43,14 +43,25 @@ class ClusterCallbackResource {
     val success = callbackPayload.success
 
     val cluster = clusterDao.fetchOneByCid(clusterId)
-    if (success && cluster != null && cluster.getStatus == ClusterStatus.PENDING) {
+    if (cluster == null) {
+      return Response
+        .status(Response.Status.NOT_FOUND)
+        .entity(s"Cluster $clusterId not found")
+        .build()
+    }
+
+    if (success && cluster.getStatus == ClusterStatus.PENDING) {
       updateClusterStatus(clusterId, ClusterStatus.RUNNING, context)
       insertClusterActivity(cluster.getCid, cluster.getCreationTime)
       Response.ok("Cluster status updated to RUNNING").build()
+    } else if (!success) {
+      // Cluster launch failed — mark it so the UI doesn't stay stuck on PENDING.
+      updateClusterStatus(clusterId, ClusterStatus.LAUNCH_FAILED, context)
+      Response.ok("Cluster status updated to LAUNCH_FAILED").build()
     } else {
       Response
-        .status(Response.Status.NOT_FOUND)
-        .entity("Cluster not found or status update not allowed")
+        .status(Response.Status.CONFLICT)
+        .entity(s"Cluster $clusterId status update not allowed (current: ${cluster.getStatus})")
         .build()
     }
   }

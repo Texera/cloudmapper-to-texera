@@ -290,8 +290,12 @@ private[storage] class DatasetFileDocument(uri: URI, isDirectory: Boolean = fals
       }
     } catch {
       case e: Exception =>
-        logger.warn(s"Error adding directory to zip: ${e.getMessage}", e)
-        // Fallback: try to get files using alternative method
+        logger.warn(
+          s"Error adding directory to zip via primary method: ${e.getMessage}. Trying fallback.",
+          e
+        )
+        // Fallback: try to get files using alternative method.
+        // NOTE: fallback throws if it also fails, so the empty-zip-with-swallowed-error scenario is avoided.
         addDirectoryToZipFallback(
           zipOutputStream,
           basePath,
