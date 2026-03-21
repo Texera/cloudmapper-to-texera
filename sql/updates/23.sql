@@ -15,22 +15,16 @@
 -- specific language governing permissions and limitations
 -- under the License.
 
--- ============================================
--- 1. Connect to the texera_db database
--- ============================================
 \c texera_db
 
 SET search_path TO texera_db;
 
--- ============================================
--- 2. Update the table schema
--- ============================================
 BEGIN;
 
+-- Add permission column to user table.
+-- Using JSONB type for better performance and indexing capabilities.
+-- Default value is an empty JSON object '{}'.
 ALTER TABLE "user"
-    ADD COLUMN IF NOT EXISTS affiliation VARCHAR(128);
-
-ALTER TABLE "user"
-    ADD COLUMN IF NOT EXISTS joining_reason VARCHAR(500);
+    ADD COLUMN IF NOT EXISTS permission JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 COMMIT;

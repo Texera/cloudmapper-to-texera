@@ -173,8 +173,11 @@ object AccessControlResource extends LazyLogging {
     val workflowComputingUnitPoolNamespace = KubernetesConfig.computeUnitPoolNamespace
     val workflowComputingUnitPoolPort = KubernetesConfig.computeUnitPortNumber
 
+    // For cu-ssh requests, route to ttyd port (7681) instead of the standard CU port
+    val targetPort = if (requireSshPermission) 7681 else workflowComputingUnitPoolPort
+
     val targetHost =
-      s"computing-unit-$cuidInt.$workflowComputingUnitPoolName-svc.$workflowComputingUnitPoolNamespace.svc.cluster.local:$workflowComputingUnitPoolPort"
+      s"computing-unit-$cuidInt.$workflowComputingUnitPoolName-svc.$workflowComputingUnitPoolNamespace.svc.cluster.local:$targetPort"
 
     Response
       .ok()
