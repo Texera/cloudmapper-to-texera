@@ -93,62 +93,65 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |    def produce(self) -> Iterator[Union[TupleLike, TableLike, None]]:
        |        import requests, time, json, base64
        |
-       |        def create_job_form_data(cluster_id, job_form):
-       |            form_data = {
-       |                'cid': str(cluster_id),
-       |            }
+       |        reads_path = r'${directoryFile.getAbsolutePath}'
+       |        service_url = "${clusterLauncherServiceTarget}"
+       |        cluster_id  = ${clusterId}
        |
-       |            files = {}
-       |            files['reads'] = open(r'${directoryFile.getAbsolutePath}', 'rb')
+       |        # ------------------------------------------------------------------
+       |        # Step 1: Ask the Go service for a presigned S3 PUT URL.
+       |        # The reads zip will be sent directly to S3 from here — the Go
+       |        # service is not in the data path for the large file.
+       |        # ------------------------------------------------------------------
+       |        upload_meta_resp = requests.post(f"{service_url}/api/job/request-upload")
+       |        upload_meta_resp.raise_for_status()
+       |        upload_meta = upload_meta_resp.json()
+       |        upload_url = upload_meta["upload_url"]
+       |        s3_key     = upload_meta["s3_key"]
+       |        job_id     = upload_meta["job_id"]
        |
-       |            # Append selected genomes and related files
-       |            append_selected_genomes_to_form_data(form_data, files, job_form)
+       |        yield  # let Texera heartbeat while we upload
        |
-       |            return form_data, files
+       |        # ------------------------------------------------------------------
+       |        # Step 2: PUT the reads zip directly to S3 (presigned URL, no proxy).
+       |        # ------------------------------------------------------------------
+       |        with open(reads_path, 'rb') as reads_file:
+       |            put_resp = requests.put(upload_url, data=reads_file)
+       |        put_resp.raise_for_status()
        |
-       |        def append_selected_genomes_to_form_data(form_data, files, job_form):
-       |            selected_genomes = job_form.get('referenceGenome', [])
+       |        yield  # let Texera heartbeat while we notify
        |
-       |            for index, genome in enumerate(selected_genomes):
-       |                form_data[f'referenceGenome[{index}]'] = genome
+       |        # ------------------------------------------------------------------
+       |        # Step 3: Notify the Go service to start the job. Pass s3_key and
+       |        # job_id so it knows which S3 object to pull on the EC2 head node.
+       |        # FASTA/GTF files (small, annotation-only) still go as multipart.
+       |        # ------------------------------------------------------------------
+       |        selected_genomes = ${pythonAllReferenceGenomes}
+       |        form_data = {
+       |            'cid':    str(cluster_id),
+       |            's3_key': s3_key,
+       |            'job_id': str(job_id),
+       |        }
+       |        for index, genome in enumerate(selected_genomes):
+       |            form_data[f'referenceGenome[{index}]'] = genome
        |
-       |            if 'My Reference' in selected_genomes:
-       |                append_fasta_and_gtf_files_to_form_data(files, job_form)
-       |
-       |        def append_fasta_and_gtf_files_to_form_data(files, job_form):
-       |            fasta_files = job_form.get('fastaFiles', [])
-       |            gtf_file = job_form.get('gtfFile')
-       |
+       |        files = {}
+       |        if 'My Reference' in selected_genomes:
+       |            fasta_files = ${pythonFastaFiles}
        |            for index, fasta_file in enumerate(fasta_files):
        |                files[f'fastaFiles[{index}]'] = fasta_file
-       |
-       |            if gtf_file:
+       |            gtf_file = ${pythonGtfFileValue}
+       |            if gtf_file is not None:
        |                files['gtfFile'] = gtf_file
        |
+       |        response = requests.post(f"{service_url}/api/job/create",
+       |                                 data=form_data, files=files if files else None)
+       |        response.raise_for_status()
        |
-       |        # Example job_form dictionary using inputs from Scala
-       |        job_form = {
-       |            'referenceGenome': ${pythonAllReferenceGenomes},
-       |            'fastaFiles': ${pythonFastaFiles} if 'My Reference' in ${pythonAllReferenceGenomes} else [],
-       |            'gtfFile': ${pythonGtfFileValue}
-       |        }
-       |
-       |        # Create form data and files based on the provided job_form
-       |        form_data, files = create_job_form_data(${clusterId}, job_form)
-       |
-       |        yield
-       |
-       |        # Send the POST request to start the job
-       |        response = requests.post("${clusterLauncherServiceTarget}/api/job/create",
-       |                                 data=form_data, files=files)
-       |
-       |        # Extract the job ID from the initial response
-       |        job_id = response.json().get("job_id")
-       |
-       |        # Poll until the job is finished
+       |        # ------------------------------------------------------------------
+       |        # Step 4: Poll until the job is finished.
+       |        # ------------------------------------------------------------------
        |        while True:
-       |            # Poll the status endpoint
-       |            status_response = requests.get(f'${clusterLauncherServiceTarget}/api/job/status/{job_id}')
+       |            status_response = requests.get(f'{service_url}/api/job/status/{job_id}')
        |            status = status_response.json().get("status")
        |
        |            if status == "finished":
@@ -168,26 +171,25 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |            time.sleep(0.5)
        |            yield
        |
-       |        # Request to download files after the job is completed
-       |        download_response = requests.get(f'${clusterLauncherServiceTarget}/api/job/download/{job_id}',
-       |                                         params={'cid': str(${clusterId})})
+       |        # ------------------------------------------------------------------
+       |        # Step 5: Download results.
+       |        # ------------------------------------------------------------------
+       |        download_response = requests.get(f'{service_url}/api/job/download/{job_id}',
+       |                                         params={'cid': str(cluster_id)})
        |
        |        if download_response.status_code == 200:
-       |            # Parse the JSON response
        |            all_file_contents = json.loads(download_response.content)
        |
        |            for subdirectory, file_contents in all_file_contents.items():
-       |                # Decode base64 content directly to bytes
        |                features_content = base64.b64decode(file_contents['features.tsv.gz'])
        |                barcodes_content = base64.b64decode(file_contents['barcodes.tsv.gz'])
-       |                matrix_content = base64.b64decode(file_contents['matrix.mtx.gz'])
+       |                matrix_content   = base64.b64decode(file_contents['matrix.mtx.gz'])
        |
-       |                # Yield the raw byte content for each subdirectory
        |                yield {
-       |                    'Sample': subdirectory,
+       |                    'Sample':          subdirectory,
        |                    'features.tsv.gz': features_content,
        |                    'barcodes.tsv.gz': barcodes_content,
-       |                    'matrix.mtx.gz': matrix_content
+       |                    'matrix.mtx.gz':   matrix_content
        |                }
        |        else:
        |            print(f"Failed to get the files. Status Code: {download_response.status_code}")
