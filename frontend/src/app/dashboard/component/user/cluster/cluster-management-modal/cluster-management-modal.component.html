@@ -1,6 +1,7 @@
 <nz-modal
   [(nzVisible)]="isVisible"
   nzTitle="Cluster Management"
+  [nzWidth]="700"
   (nzOnCancel)="closeClusterManagementModal()"
   (nzOnOk)="submitCluster()">
   <ng-container *nzModalContent>
@@ -24,12 +25,18 @@
           <nz-input-group nzPrefixIcon="setting">
             <nz-select
               formControlName="machineType"
-              nzPlaceHolder="Select Machine Type">
-              <nz-option
-                *ngFor="let option of machineOptions"
-                [nzValue]="option.value"
-                [nzLabel]="option.label">
-              </nz-option>
+              nzPlaceHolder="Select Machine Type"
+              [nzDropdownMatchSelectWidth]="false"
+              [nzDropdownStyle]="{ 'min-width': '550px' }">
+              <nz-option-group
+                *ngFor="let group of machineOptionGroups"
+                [nzLabel]="group.label">
+                <nz-option
+                  *ngFor="let option of group.options"
+                  [nzValue]="option.value"
+                  [nzLabel]="option.label">
+                </nz-option>
+              </nz-option-group>
             </nz-select>
           </nz-input-group>
         </nz-form-control>

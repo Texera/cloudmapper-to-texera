@@ -148,18 +148,22 @@ export class ClusterComponent implements OnInit, OnDestroy {
     }
   }
   getMachineTypeInfo(machineType: string): string {
-    switch (machineType) {
-      case "t2.micro":
-        return "1 CPU, 1 GB RAM, $0.0116/hour";
-      case "t3.large":
-        return "2 CPUs, 8 GB RAM, $0.0832/hour";
-      case "t3.xlarge":
-        return "4 CPUs, 16 GB RAM, $0.1664/hour";
-      case "t3.2xlarge":
-        return "8 CPUs, 32 GB RAM, $0.3328/hour";
-      default:
-        return "Information not available";
-    }
+    const info: Record<string, string> = {
+      "t2.micro":    "1 vCPU, 1 GB RAM, no NVMe, $0.0116/hr",
+      "t3.large":    "2 vCPUs, 8 GB RAM, no NVMe, $0.0832/hr",
+      "t3.xlarge":   "4 vCPUs, 16 GB RAM, no NVMe, $0.1664/hr",
+      "t3.2xlarge":  "8 vCPUs, 32 GB RAM, no NVMe, $0.3328/hr",
+      "c5d.2xlarge": "8 vCPUs, 16 GB RAM, 200 GB NVMe, $0.384/hr",
+      "c5d.4xlarge": "16 vCPUs, 32 GB RAM, 400 GB NVMe, $0.768/hr",
+      "c5d.9xlarge": "36 vCPUs, 72 GB RAM, 900 GB NVMe, $1.728/hr",
+      "r5d.2xlarge": "8 vCPUs, 64 GB RAM, 300 GB NVMe, $0.576/hr",
+      "r5d.4xlarge": "16 vCPUs, 128 GB RAM, 600 GB NVMe, $1.152/hr",
+      "r5d.8xlarge": "32 vCPUs, 256 GB RAM, 1200 GB NVMe, $2.304/hr",
+      "m5d.xlarge":  "4 vCPUs, 16 GB RAM, 150 GB NVMe, $0.226/hr",
+      "m5d.2xlarge": "8 vCPUs, 32 GB RAM, 300 GB NVMe, $0.452/hr",
+      "m5d.4xlarge": "16 vCPUs, 64 GB RAM, 600 GB NVMe, $0.904/hr",
+    };
+    return info[machineType] ?? "Information not available";
   }
 
   onPageIndexChange(index: number): void {

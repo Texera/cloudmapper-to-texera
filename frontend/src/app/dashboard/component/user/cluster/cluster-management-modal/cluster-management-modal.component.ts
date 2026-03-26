@@ -12,16 +12,42 @@ export class ClusterManagementModalComponent {
   @Output() submitClusterEvent = new EventEmitter<FormGroup>();
   clusterForm!: FormGroup;
 
-  machineOptions = [
-    { value: "t2.micro", label: "t2.micro - 1 CPU, 1 GB RAM, $0.0116/hour" },
-    { value: "t3.large", label: "t3.large - 2 CPUs, 8 GB RAM, $0.0832/hour" },
+  // Instance types grouped by storage tier.
+  // NVMe instances are recommended for large genome indices (t-series have no
+  // instance storage and rely entirely on EFS for index I/O).
+  machineOptionGroups = [
     {
-      value: "t3.xlarge",
-      label: "t3.xlarge - 4 CPUs, 16 GB RAM, $0.1664/hour",
+      label: "General Purpose — No local NVMe (dev / small genomes)",
+      options: [
+        { value: "t2.micro",   label: "t2.micro   —  1 vCPU,   1 GB RAM,  no NVMe,  $0.0116/hr" },
+        { value: "t3.large",   label: "t3.large   —  2 vCPUs,  8 GB RAM,  no NVMe,  $0.0832/hr" },
+        { value: "t3.xlarge",  label: "t3.xlarge  —  4 vCPUs, 16 GB RAM,  no NVMe,  $0.1664/hr" },
+        { value: "t3.2xlarge", label: "t3.2xlarge —  8 vCPUs, 32 GB RAM,  no NVMe,  $0.3328/hr" },
+      ],
     },
     {
-      value: "t3.2xlarge",
-      label: "t3.2xlarge - 8 CPUs, 32 GB RAM, $0.3328/hour",
+      label: "Compute Optimised + NVMe (recommended for alignment)",
+      options: [
+        { value: "c5d.2xlarge", label: "c5d.2xlarge —  8 vCPUs,  16 GB RAM,  200 GB NVMe,  $0.384/hr" },
+        { value: "c5d.4xlarge", label: "c5d.4xlarge — 16 vCPUs,  32 GB RAM,  400 GB NVMe,  $0.768/hr" },
+        { value: "c5d.9xlarge", label: "c5d.9xlarge — 36 vCPUs,  72 GB RAM,  900 GB NVMe,  $1.728/hr" },
+      ],
+    },
+    {
+      label: "Memory Optimised + NVMe (large genomes / multi-sample)",
+      options: [
+        { value: "r5d.2xlarge", label: "r5d.2xlarge —  8 vCPUs,  64 GB RAM,  300 GB NVMe,  $0.576/hr" },
+        { value: "r5d.4xlarge", label: "r5d.4xlarge — 16 vCPUs, 128 GB RAM,  600 GB NVMe,  $1.152/hr" },
+        { value: "r5d.8xlarge", label: "r5d.8xlarge — 32 vCPUs, 256 GB RAM, 1200 GB NVMe,  $2.304/hr" },
+      ],
+    },
+    {
+      label: "Balanced + NVMe (general production workloads)",
+      options: [
+        { value: "m5d.xlarge",  label: "m5d.xlarge  —  4 vCPUs,  16 GB RAM,  150 GB NVMe,  $0.226/hr" },
+        { value: "m5d.2xlarge", label: "m5d.2xlarge —  8 vCPUs,  32 GB RAM,  300 GB NVMe,  $0.452/hr" },
+        { value: "m5d.4xlarge", label: "m5d.4xlarge — 16 vCPUs,  64 GB RAM,  600 GB NVMe,  $0.904/hr" },
+      ],
     },
   ];
 
