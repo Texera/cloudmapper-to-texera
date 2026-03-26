@@ -91,7 +91,7 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |
        |    @overrides
        |    def produce(self) -> Iterator[Union[TupleLike, TableLike, None]]:
-       |        import requests, time, json, base64
+       |        import requests, time, tarfile, io
        |
        |        reads_path = r'${directoryFile.getAbsolutePath}'
        |        service_url = "${clusterLauncherServiceTarget}"
@@ -173,32 +173,49 @@ class CloudMapperSourceOpDesc extends PythonSourceOperatorDescriptor {
        |
        |        # ------------------------------------------------------------------
        |        # Step 5: Download results.
+       |        # The server streams a tar.gz archive containing all filtered/
+       |        # output files.  We parse it member-by-member so the operator
+       |        # never holds the entire decompressed matrix in RAM at once.
        |        # ------------------------------------------------------------------
        |        download_response = requests.get(f'{service_url}/api/job/download/{job_id}',
-       |                                         params={'cid': str(cluster_id)})
+       |                                         stream=True)
+       |        download_response.raise_for_status()
        |
-       |        if download_response.status_code == 200:
-       |            all_file_contents = json.loads(download_response.content)
+       |        # urllib3 raw socket; tell it to handle transport-encoding itself
+       |        download_response.raw.decode_content = True
        |
-       |            for subdirectory, file_contents in all_file_contents.items():
-       |                features_content = base64.b64decode(file_contents['features.tsv.gz'])
-       |                barcodes_content = base64.b64decode(file_contents['barcodes.tsv.gz'])
-       |                matrix_content   = base64.b64decode(file_contents['matrix.mtx.gz'])
+       |        samples = {}
+       |        with tarfile.open(fileobj=download_response.raw, mode='r|gz') as tar:
+       |            for member in tar:
+       |                if not member.isfile():
+       |                    continue
+       |                parts = member.name.split('/')
+       |                # Expected layout: <SampleName>/filtered/<file>.gz
+       |                if len(parts) < 3:
+       |                    continue
+       |                sample_name = parts[0]
+       |                fname = parts[-1]
+       |                if fname in ('features.tsv.gz', 'barcodes.tsv.gz', 'matrix.mtx.gz'):
+       |                    f = tar.extractfile(member)
+       |                    if f is not None:
+       |                        samples.setdefault(sample_name, {})[fname] = f.read()
        |
-       |                yield {
-       |                    'Sample':          subdirectory,
-       |                    'features.tsv.gz': features_content,
-       |                    'barcodes.tsv.gz': barcodes_content,
-       |                    'matrix.mtx.gz':   matrix_content
-       |                }
-       |        else:
-       |            print(f"Failed to get the files. Status Code: {download_response.status_code}")
-       |            print(f"Response Text: {download_response.text}")
+       |        if not samples:
+       |            print("Download succeeded but archive contained no recognised files.")
        |            yield {
        |                'Sample': None,
        |                'features.tsv.gz': None,
        |                'barcodes.tsv.gz': None,
        |                'matrix.mtx.gz': None
+       |            }
+       |            return
+       |
+       |        for sample_name, files in samples.items():
+       |            yield {
+       |                'Sample':          sample_name,
+       |                'features.tsv.gz': files.get('features.tsv.gz'),
+       |                'barcodes.tsv.gz': files.get('barcodes.tsv.gz'),
+       |                'matrix.mtx.gz':   files.get('matrix.mtx.gz')
        |            }
     """.stripMargin
   }
