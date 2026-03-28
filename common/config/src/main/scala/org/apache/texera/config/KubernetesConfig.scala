@@ -64,12 +64,4 @@ object KubernetesConfig {
 
   // GPU resource key used directly in Kubernetes resource specifications
   val gpuResourceKey: String = conf.getString("kubernetes.computing-unit-gpu-resource-key")
-
-  // Ephemeral-storage request and limit per computing unit pod; empty string means not applied.
-  val ephemeralStorageRequest: String = conf.getString("kubernetes.computing-unit-ephemeral-storage-request").trim
-  val ephemeralStorageLimit: String = conf.getString("kubernetes.computing-unit-ephemeral-storage-limit").trim
-
-  // Optional host-path volume: maps a physical directory on the node into the pod.
-  val hostPath: String = conf.getString("kubernetes.computing-unit-host-path").trim
-  val hostPathMount: String = conf.getString("kubernetes.computing-unit-host-path-mount").trim
 }

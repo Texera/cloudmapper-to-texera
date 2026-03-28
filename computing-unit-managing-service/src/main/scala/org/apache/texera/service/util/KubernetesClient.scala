@@ -106,17 +106,7 @@ object KubernetesClient {
     // Setup the resource requirements
     val resourceBuilder = new ResourceRequirementsBuilder()
       .addToLimits("cpu", new Quantity(cpuLimit))
-      .addToRequests("cpu", new Quantity(cpuLimit))
       .addToLimits("memory", new Quantity(memoryLimit))
-      .addToRequests("memory", new Quantity(memoryLimit))
-
-    // Apply ephemeral-storage request/limit when configured to prevent node disk pressure evictions
-    if (KubernetesConfig.ephemeralStorageRequest.nonEmpty) {
-      resourceBuilder.addToRequests("ephemeral-storage", new Quantity(KubernetesConfig.ephemeralStorageRequest))
-    }
-    if (KubernetesConfig.ephemeralStorageLimit.nonEmpty) {
-      resourceBuilder.addToLimits("ephemeral-storage", new Quantity(KubernetesConfig.ephemeralStorageLimit))
-    }
 
     // Only add GPU resources if the requested amount is greater than 0
     if (gpuLimit != "0") {
@@ -163,15 +153,6 @@ object KubernetesClient {
         .endVolumeMount()
     }
 
-    // Mount the host-path volume if both path and mount are configured
-    if (KubernetesConfig.hostPath.nonEmpty && KubernetesConfig.hostPathMount.nonEmpty) {
-      containerBuilder
-        .addNewVolumeMount()
-        .withName("big-storage-pool")
-        .withMountPath(KubernetesConfig.hostPathMount)
-        .endVolumeMount()
-    }
-
     containerBuilder.endContainer()
 
     // Add tmpfs volume if needed
@@ -185,18 +166,6 @@ object KubernetesClient {
             .withSizeLimit(new Quantity(size))
             .build()
         )
-        .endVolume()
-    }
-
-    // Add host-path volume if configured
-    if (KubernetesConfig.hostPath.nonEmpty && KubernetesConfig.hostPathMount.nonEmpty) {
-      specBuilder
-        .addNewVolume()
-        .withName("big-storage-pool")
-        .withNewHostPath()
-        .withPath(KubernetesConfig.hostPath)
-        .withType("DirectoryOrCreate")
-        .endHostPath()
         .endVolume()
     }
 
