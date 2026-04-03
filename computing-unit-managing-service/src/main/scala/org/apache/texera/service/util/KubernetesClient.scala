@@ -81,6 +81,7 @@ object KubernetesClient {
 
   def createPod(
       cuid: Int,
+      uid: Int,
       cpuLimit: String,
       memoryLimit: String,
       gpuLimit: String,
@@ -153,6 +154,15 @@ object KubernetesClient {
         .endVolumeMount()
     }
 
+    // If per-user persistent storage is enabled for this user, mount the user's PVC
+    if (KubernetesConfig.isUserStorageAllowed(uid)) {
+      containerBuilder
+        .addNewVolumeMount()
+        .withName("user-data")
+        .withMountPath(KubernetesConfig.userStorageMountPath)
+        .endVolumeMount()
+    }
+
     containerBuilder.endContainer()
 
     // Add tmpfs volume if needed
@@ -169,6 +179,18 @@ object KubernetesClient {
         .endVolume()
     }
 
+    // Add per-user persistent storage volume if enabled for this user
+    if (KubernetesConfig.isUserStorageAllowed(uid)) {
+      createUserStoragePvcIfAbsent(uid)
+      specBuilder
+        .addNewVolume()
+        .withName("user-data")
+        .withNewPersistentVolumeClaim()
+        .withClaimName(generateUserPvcName(uid))
+        .endPersistentVolumeClaim()
+        .endVolume()
+    }
+
     val pod = specBuilder
       .withHostname(podName)
       .withSubdomain(KubernetesConfig.computeUnitServiceName)
@@ -180,5 +202,29 @@ object KubernetesClient {
 
   def deletePod(cuid: Int): Unit = {
     client.pods().inNamespace(namespace).withName(generatePodName(cuid)).delete()
+  }
+
+  def generateUserPvcName(uid: Int): String = s"user-storage-$uid"
+
+  /** Creates the per-user PVC if it does not yet exist. The PVC persists after pod deletion. */
+  def createUserStoragePvcIfAbsent(uid: Int): Unit = {
+    val pvcName = generateUserPvcName(uid)
+    val existing = client.persistentVolumeClaims().inNamespace(namespace).withName(pvcName).get()
+    if (existing == null) {
+      val pvc = new PersistentVolumeClaimBuilder()
+        .withNewMetadata()
+        .withName(pvcName)
+        .withNamespace(namespace)
+        .endMetadata()
+        .withNewSpec()
+        .withAccessModes("ReadWriteMany")
+        .withStorageClassName(KubernetesConfig.userStorageClass)
+        .withNewResources()
+        .addToRequests("storage", new Quantity(KubernetesConfig.userStorageSize))
+        .endResources()
+        .endSpec()
+        .build()
+      client.resource(pvc).inNamespace(namespace).create()
+    }
   }
 }

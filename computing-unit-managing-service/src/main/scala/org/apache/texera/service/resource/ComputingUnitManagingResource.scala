@@ -432,6 +432,7 @@ class ComputingUnitManagingResource {
         try {
           KubernetesClient.createPod(
             cuid,
+            user.getUid,
             param.cpuLimit,
             param.memoryLimit,
             param.gpuLimit,

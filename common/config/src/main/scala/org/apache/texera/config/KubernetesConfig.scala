@@ -64,4 +64,23 @@ object KubernetesConfig {
 
   // GPU resource key used directly in Kubernetes resource specifications
   val gpuResourceKey: String = conf.getString("kubernetes.computing-unit-gpu-resource-key")
+
+  // Per-user persistent storage: each user gets an isolated PVC created dynamically by the manager
+  val userStorageEnabled: Boolean = conf.getBoolean("kubernetes.user-storage-enabled")
+  val userStorageClass: String = conf.getString("kubernetes.user-storage-class")
+  val userStorageSize: String = conf.getString("kubernetes.user-storage-size")
+  val userStorageMountPath: String = conf.getString("kubernetes.user-storage-mount-path")
+
+  /** UIDs allowed to have persistent storage. Empty set means all users are allowed. */
+  val userStorageAllowedUids: Set[Int] =
+    conf
+      .getString("kubernetes.user-storage-allowed-uids")
+      .split(",")
+      .map(_.trim)
+      .filter(_.nonEmpty)
+      .map(_.toInt)
+      .toSet
+
+  def isUserStorageAllowed(uid: Int): Boolean =
+    userStorageEnabled && (userStorageAllowedUids.isEmpty || userStorageAllowedUids.contains(uid))
 }
