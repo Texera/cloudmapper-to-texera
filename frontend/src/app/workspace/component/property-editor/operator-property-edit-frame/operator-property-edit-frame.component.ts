@@ -467,6 +467,15 @@ export class OperatorPropertyEditFrameComponent implements OnInit, OnChanges, On
         mappedField.type = "directorypathinput";
       }
 
+      // if the title is fileName, then change it to custom autocomplete input template
+      if (mappedField.key === "fileName") {
+        mappedField.type = "inputautocomplete";
+      }
+
+      if (mappedField.key === "datasetVersionPath") {
+        mappedField.type = "datasetversionselector";
+      }
+
       // if the title is python script (for Python UDF), then make this field a custom template 'codearea'
       if (mapSource?.description?.toLowerCase() === "input your code here") {
         if (mappedField.type) {
