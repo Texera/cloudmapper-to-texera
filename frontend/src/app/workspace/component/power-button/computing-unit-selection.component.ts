@@ -75,6 +75,7 @@ export class ComputingUnitSelectionComponent implements OnInit {
   selectedMemory: string = "";
   selectedCpu: string = "";
   selectedGpu: string = "0"; // Default to no GPU
+  selectedGpuModel: string = "Any"; // Default to any GPU model
   selectedJvmMemorySize: string = "1G"; // Initial JVM memory size
   selectedComputingUnitType?: WorkflowComputingUnitType; // Selected computing unit type
   selectedShmSize: string = "64Mi"; // Shared memory size
@@ -97,7 +98,8 @@ export class ComputingUnitSelectionComponent implements OnInit {
   // cpu&memory limit options from backend
   cpuOptions: string[] = [];
   memoryOptions: string[] = [];
-  gpuOptions: string[] = []; // Add GPU options array
+  gpuOptions: string[] = [];
+  gpuModelOptions: string[] = [];
 
   constructor(
     private computingUnitService: WorkflowComputingUnitManagingService,
@@ -287,10 +289,42 @@ export class ComputingUnitSelectionComponent implements OnInit {
     return unit.computingUnit.uri === this.selectedComputingUnit?.computingUnit.uri;
   }
 
-  // Determines if the GPU selection dropdown should be shown
+  // Determines if the GPU count selection dropdown should be shown
   showGpuSelection(): boolean {
-    // Don't show GPU selection if there are no options or only "0" option
     return this.gpuOptions.length > 1 || (this.gpuOptions.length === 1 && this.gpuOptions[0] !== "0");
+  }
+
+  // Determines if the GPU model dropdown should be shown.
+  // Only shown when the user has selected at least one GPU AND the backend
+  // returned more than just the "Any" option (i.e., at least one labeled node exists).
+  showGpuModelSelection(): boolean {
+    return this.selectedGpu !== "0" && this.gpuModelOptions.length > 1;
+  }
+
+  // Called when the GPU count dropdown value changes.
+  // Re-fetches the list of currently available GPU models for the new count.
+  onGpuCountChange(newCount: string): void {
+    this.selectedGpu = newCount;
+    this.selectedGpuModel = "Any";
+    this.gpuModelOptions = [];
+
+    if (newCount === "0") {
+      return;
+    }
+
+    this.computingUnitService
+      .getAvailableGpuModels(+newCount)
+      .pipe(untilDestroyed(this))
+      .subscribe({
+        next: models => {
+          this.gpuModelOptions = models;
+          this.selectedGpuModel = models[0] ?? "Any";
+        },
+        error: () => {
+          this.gpuModelOptions = ["Any"];
+          this.selectedGpuModel = "Any";
+        },
+      });
   }
 
   showAddComputeUnitModalVisible(): void {
@@ -337,6 +371,7 @@ export class ComputingUnitSelectionComponent implements OnInit {
       gpu: this.selectedGpu,
       jvmMemorySize: this.selectedJvmMemorySize,
       shmSize: `${this.shmSizeValue}${this.shmSizeUnit}`,
+      gpuModel: this.selectedGpuModel,
       localUri: this.localComputingUnitUri,
     };
 

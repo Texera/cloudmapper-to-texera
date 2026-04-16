@@ -114,7 +114,8 @@ object ComputingUnitManagingResource {
       gpuLimit: String,
       jvmMemorySize: String,
       shmSize: String,
-      uri: Option[String] = None
+      uri: Option[String] = None,
+      gpuModel: Option[String] = None
   )
 
   case class WorkflowComputingUnitResourceLimit(
@@ -248,6 +249,32 @@ class ComputingUnitManagingResource {
   def getComputingUnitTypes(
       @Auth @unused user: SessionUser
   ): ComputingUnitTypesResponse = ComputingUnitTypesResponse(getSupportedComputingUnitTypes)
+
+  /**
+    * Returns GPU model labels for nodes that currently have enough free GPU capacity.
+    *
+    * The list is recomputed on every call by querying live K8s node state and running pod
+    * GPU resource usage, so it reflects real-time availability.  "Any" is always the first
+    * entry and means the scheduler picks the node freely.
+    *
+    * @param gpuCount number of GPUs the user intends to request (default 1)
+    * @return JSON array of available GPU model strings, e.g. ["Any","H200","A40"]
+    */
+  @GET
+  @RolesAllowed(Array("REGULAR", "ADMIN"))
+  @Produces(Array(MediaType.APPLICATION_JSON))
+  @Path("/available-gpu-models")
+  def getAvailableGpuModels(
+      @QueryParam("gpuCount") @DefaultValue("1") gpuCount: Int,
+      @Auth @unused user: SessionUser
+  ): List[String] = {
+    if (!KubernetesConfig.kubernetesComputingUnitEnabled) return List("Any")
+    try {
+      KubernetesClient.getAvailableGpuModels(gpuCount)
+    } catch {
+      case _: Throwable => List("Any")
+    }
+  }
 
   /**
     * Create a new pod for the given user ID.
@@ -445,7 +472,8 @@ class ComputingUnitManagingResource {
               EnvironmentalVariable.ENV_LAKEFS_AUTH_PASSWORD -> StorageConfig.lakefsPassword,
               EnvironmentalVariable.ENV_LAKEFS_ENDPOINT -> StorageConfig.lakefsEndpoint
             ),
-            Some(param.shmSize)
+            Some(param.shmSize),
+            param.gpuModel
           )
 
         } catch {

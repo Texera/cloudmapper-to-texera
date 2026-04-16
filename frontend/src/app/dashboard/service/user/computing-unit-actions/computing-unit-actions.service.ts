@@ -39,6 +39,7 @@ export interface StartComputingUnitRequest {
   gpu: string;
   jvmMemorySize: string;
   shmSize: string;
+  gpuModel: string;
   localUri: string;
 }
 
@@ -77,7 +78,8 @@ export class ComputingUnitActionsService {
         request.memory,
         request.gpu,
         request.jvmMemorySize,
-        request.shmSize
+        request.shmSize,
+        request.gpuModel
       );
     }
 
